@@ -24,6 +24,10 @@ else if (_all.Count == 0)
 else
 {
     <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-3" Spacing="3">
+        <MudAutocomplete T="string" Value="_search" ValueChanged="OnSearchChanged" Label="Search blade"
+                         SearchFunc="SearchBlades" Clearable="true" ResetValueOnEmptyText="true"
+                         CoerceValue="true" Variant="Variant.Outlined" Dense="true"
+                         AdornmentIcon="@Icons.Material.Filled.Search" Style="max-width: 18rem;" />
         <MudSelect T="string" Value="_selectedWindow" ValueChanged="OnWindowChanged" Label="Time range"
                    Variant="Variant.Outlined" Dense="true" Style="max-width: 14rem;">
             @foreach (var w in Windows)
@@ -46,6 +50,7 @@ else
               T="BladeRow" @bind-SelectedItem="_selected">
         <HeaderContent>
             <MudTh />
+            <MudTh Style="width: 3rem;">#</MudTh>
             <MudTh><MudTableSortLabel SortBy="@((BladeRow b) => b.Blade)" T="BladeRow">Blade</MudTableSortLabel></MudTh>
             <MudTh><MudTableSortLabel SortBy="@((BladeRow b) => b.ComboCount)" T="BladeRow">Combos</MudTableSortLabel></MudTh>
             <MudTh><MudTableSortLabel SortBy="@((BladeRow b) => b.First)" T="BladeRow">#1</MudTableSortLabel></MudTh>
@@ -58,6 +63,7 @@ else
                 <MudIconButton Size="Size.Small" OnClick="@(() => Toggle(context.Blade))"
                                Icon="@(IsExpanded(context.Blade) ? Icons.Material.Filled.KeyboardArrowUp : Icons.Material.Filled.KeyboardArrowDown)" />
             </MudTd>
+            <MudTd DataLabel="#" Class="mud-text-secondary">@context.Rank</MudTd>
             <MudTd DataLabel="Blade"><strong>@context.Blade</strong></MudTd>
             <MudTd DataLabel="Combos">@context.ComboCount</MudTd>
             <MudTd DataLabel="#1">@context.First</MudTd>
@@ -69,7 +75,7 @@ else
             @if (IsExpanded(context.Blade))
             {
                 <MudTr>
-                    <td colspan="7" class="pa-4" style="background: var(--mud-palette-background-grey);">
+                    <td colspan="8" class="pa-4" style="background: var(--mud-palette-background-grey);">
                         <MudText Typo="Typo.subtitle2" Class="mb-2">Combos run on @context.Blade — best first</MudText>
                         <MudSimpleTable Dense="true" Style="background: transparent;">
                             <thead>
@@ -122,6 +128,7 @@ else
     public sealed record BladeRow(string Blade, int ComboCount, int First, int Second, int Third)
     {
         public int Score => 3 * First + 2 * Second + Third;
+        public int Rank { get; init; }
     }
 
     // Relative time windows measured back from today; null cutoff = all time.
@@ -140,6 +147,7 @@ else
     private List<Appearance>? _all;
     private int _undatedCount;
     private string _selectedWindow = "4w";
+    private string? _search;
     private BladeRow? _selected;
     private readonly HashSet<string> _expanded = [];
 
@@ -157,15 +165,41 @@ else
 
     private int FilteredCount => Filtered.Count();
 
-    private IEnumerable<BladeRow> Blades => Filtered
-        .GroupBy(a => a.Blade)
-        .Select(g => new BladeRow(
-            g.Key,
-            g.Select(a => a.Display).Distinct().Count(),
-            g.Count(a => a.Placement == 1),
-            g.Count(a => a.Placement == 2),
-            g.Count(a => a.Placement == 3)))
-        .OrderByDescending(b => b.Score);
+    private IEnumerable<BladeRow> Blades
+    {
+        get
+        {
+            // Rank by score over the whole time window first, so a searched blade keeps its true rank.
+            var ranked = Filtered
+                .GroupBy(a => a.Blade)
+                .Select(g => new BladeRow(
+                    g.Key,
+                    g.Select(a => a.Display).Distinct().Count(),
+                    g.Count(a => a.Placement == 1),
+                    g.Count(a => a.Placement == 2),
+                    g.Count(a => a.Placement == 3)))
+                .OrderByDescending(b => b.Score)
+                .Select((b, i) => b with { Rank = i + 1 });
+
+            return string.IsNullOrWhiteSpace(_search)
+                ? ranked
+                : ranked.Where(b => b.Blade.Contains(_search, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
+    private Task<IEnumerable<string>> SearchBlades(string? value, CancellationToken ct)
+    {
+        var names = Filtered.Select(a => a.Blade).Distinct();
+        if (!string.IsNullOrWhiteSpace(value))
+            names = names.Where(n => n.Contains(value, StringComparison.OrdinalIgnoreCase));
+        return Task.FromResult(names.OrderBy(n => n, StringComparer.OrdinalIgnoreCase).Take(20));
+    }
+
+    private void OnSearchChanged(string? value)
+    {
+        _search = value;
+        _expanded.Clear();
+    }
 
     private IEnumerable<ComboRow> CombosFor(string blade) => Filtered
         .Where(a => a.Blade == blade)

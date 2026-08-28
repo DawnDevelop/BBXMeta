@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json;
 using BeybladeMeta.Core.Data;
 using BeybladeMeta.Core.Ingestion;
+using BeybladeMeta.Core.Models;
 using BeybladeMeta.Core.Parsing;
 using BeybladeMeta.Indexer;
 using Microsoft.EntityFrameworkCore;
@@ -57,10 +58,18 @@ static async Task ExportAsync(MetaDbContext db, string outDir)
 {
     var jsonOptions = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
-    var appearances = (await db.Appearances
-            .Select(a => new { a.Blade, a.Display, a.Placement, a.Post!.PostedAt })
-            .ToListAsync())
-        .Select(a => new { a.Blade, a.Display, a.Placement, Date = a.PostedAt?.ToString("yyyy-MM-dd") });
+    var rows = await db.Appearances
+        .Select(a => new { a.Blade, a.AssistBlade, a.Ratchet, a.Bit, a.Placement, a.Post!.PostedAt })
+        .ToListAsync();
+
+    // Merge blade spelling variants, then rebuild each display from the canonical blade.
+    var bladeMap = BladeCanonicalizer.BuildMap(rows.Select(r => r.Blade));
+    var appearances = rows.Select(r =>
+    {
+        var blade = bladeMap[r.Blade];
+        var display = new Combo(blade, r.AssistBlade, r.Ratchet, r.Bit).Display;
+        return new { Blade = blade, Display = display, r.Placement, Date = r.PostedAt?.ToString("yyyy-MM-dd") };
+    });
     await File.WriteAllTextAsync(Path.Combine(outDir, "appearances.json"),
         JsonSerializer.Serialize(appearances, jsonOptions));
 
