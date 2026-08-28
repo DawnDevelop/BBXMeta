@@ -19,10 +19,12 @@ public static partial class BladeCanonicalizer
     private static partial Regex NonLetters();
 
     /// <summary>Explicit synonym map: token-sort Key(variant) → canonical spelling.</summary>
+    // Takara Tomy (JP) ↔ Hasbro (Western) name pairs for the same blade.
     public static readonly IReadOnlyDictionary<string, string> Aliases = new Dictionary<string, string>
     {
-        ["wand wizard"] = "WizardRod",   // "Wand Wizard" = Wizard Rod (rod/wand synonym)
-        ["sterling wolf"] = "SilverWolf", // Sterling Wolf = Silver Wolf (same blade)
+        ["wand wizard"] = "WizardRod",    // Hasbro Wand Wizard = TT Wizard Rod
+        ["sterling wolf"] = "SilverWolf", // Hasbro Sterling Wolf = TT Silver Wolf
+        ["phoenix soar"] = "PhoenixWing", // Hasbro Soar Phoenix = TT Phoenix Wing
     };
 
     /// <summary>Word-order/spacing-invariant key: words lowercased and alphabetised.</summary>
