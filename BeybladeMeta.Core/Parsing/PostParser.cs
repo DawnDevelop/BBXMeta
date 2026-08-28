@@ -4,12 +4,8 @@ using BeybladeMeta.Core.Models;
 namespace BeybladeMeta.Core.Parsing;
 
 /// <summary>
-/// Parses one forum post into placement blocks (1st/2nd/3rd) and their combos.
-/// Combos are parsed structurally: the ratchet code (e.g. "3-60") anchors the line,
-/// with the blade before it and the bit after — so any combo parses without a blade
-/// catalog. Ratchet-less unique-blade combos are recognized by their trailing bit.
-/// Player names are intentionally discarded. Lines that are not combo attempts
-/// (prose, rules, links) are skipped silently rather than flagged.
+/// Parses a forum post into 1st/2nd/3rd placement blocks and their combos, anchored
+/// on the ratchet code so no blade catalog is needed. Player names are discarded.
 /// </summary>
 public sealed partial class PostParser(PartsVocabulary vocabulary)
 {
@@ -49,7 +45,7 @@ public sealed partial class PostParser(PartsVocabulary vocabulary)
                 FlushBlock();
                 var num = int.Parse(marker.Groups["num"].Value);
                 currentPlacement = num is >= 1 and <= 3 ? num : 0;
-                continue; // rest of the line is the player name — deliberately ignored
+                continue; // remainder of the line is the player name — ignored
             }
 
             if (currentPlacement == 0)
@@ -71,7 +67,7 @@ public sealed partial class PostParser(PartsVocabulary vocabulary)
         return new ParsedPost(placements, unmatched);
     }
 
-    /// <summary>Parse a single combo line in isolation (used to reprocess already-exported lines).</summary>
+    /// <summary>Parse a single combo line in isolation.</summary>
     public Combo? TryParseCombo(string line) => TryParseComboLine(line.Trim());
 
     private Combo? TryParseComboLine(string line)
@@ -91,7 +87,7 @@ public sealed partial class PostParser(PartsVocabulary vocabulary)
             return new Combo(blade, assist, ratchet.Value, vocabulary.CanonicalBit(bit));
         }
 
-        // No ratchet: only accept if the line ends with a known bit (unique/CX blades).
+        // No ratchet: accept only if the line ends with a known bit (unique/CX blades).
         if (vocabulary.SplitTrailingBit(cleaned.TrimEnd('.', ',', ';')) is not var (bladePart2, bit2) || bladePart2 is null)
             return null;
         var (blade2, assist2) = SplitAssist(bladePart2);
@@ -106,8 +102,7 @@ public sealed partial class PostParser(PartsVocabulary vocabulary)
         return (bladePart, null);
     }
 
-    // Strip trailing annotations the thread appends to bits: "- Finals",
-    // "- Swiss - Finals", ", First & Final", stray brackets/quotes.
+    // Strip trailing annotations like "- Finals", ", First & Final", stray brackets.
     private static string CleanBit(string bit)
     {
         bit = bit.Split(" - ", 2)[0];
@@ -115,8 +110,7 @@ public sealed partial class PostParser(PartsVocabulary vocabulary)
         return bit.Trim().Trim('[', ']', '(', ')', '"', '\'', '.', ' ');
     }
 
-    // A line is a combo attempt if it has a ratchet or ends with a known bit.
-    // Everything else (rules, links, commentary) is not flagged as unmatched.
+    // A combo attempt has a ratchet or ends with a known bit; other prose isn't flagged.
     private bool LooksLikeComboAttempt(string line)
     {
         var cleaned = Parenthetical().Replace(line, "").Trim();

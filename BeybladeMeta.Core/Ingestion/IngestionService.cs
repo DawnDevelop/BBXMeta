@@ -8,7 +8,7 @@ public sealed record IngestReport(int PostsSeen, int PostsIngested, int Combos, 
 
 public sealed class IngestionService(MetaDbContext db, PostParser parser)
 {
-    /// <summary>Ingest one thread page's HTML (fetched or loaded from a saved file). Already-seen posts are skipped.</summary>
+    /// <summary>Ingest one thread page's HTML; already-seen posts are skipped.</summary>
     public async Task<IngestReport> IngestHtmlAsync(string html, int page, CancellationToken ct = default)
     {
         var posts = MyBbPostExtractor.Extract(html);

@@ -3,21 +3,11 @@ using BeybladeMeta.Core.Ingestion;
 namespace BeybladeMeta.Indexer;
 
 /// <summary>
-/// Fetches thread pages through a third-party scraping API that renders JS and
-/// solves Cloudflare from residential proxies. Service-agnostic: the endpoint is
-/// a URL template so any provider (ScraperAPI, ZenRows, ScrapingBee, …) works by
-/// changing configuration only.
+/// Fetches thread pages through a scraping API that renders JS and solves Cloudflare
+/// from residential proxies. Service-agnostic via a URL template.
 ///
-/// Environment:
-///   SCRAPER_API_KEY       the provider API key (required)
-///   SCRAPER_URL_TEMPLATE  endpoint template with {KEY} and {URL} placeholders.
-///                         {URL} is url-encoded; {URL_RAW} is inserted verbatim.
-///   SCRAPER_MAX_ATTEMPTS  per-page retry count (default 3)
-///
-/// Example templates (fill the real one after picking a provider):
-///   ScraperAPI:  https://api.scraperapi.com/?api_key={KEY}&url={URL}&render=true&ultra_premium=true
-///   ZenRows:     https://api.zenrows.com/v1/?apikey={KEY}&url={URL}&js_render=true&antibot=true
-///   ScrapingBee: https://app.scrapingbee.com/api/v1/?api_key={KEY}&url={URL}&render_js=true&stealth_proxy=true
+/// Environment: SCRAPER_API_KEY (required), SCRAPER_URL_TEMPLATE ({KEY} and {URL}
+/// placeholders; {URL} url-encoded, {URL_RAW} verbatim), SCRAPER_MAX_ATTEMPTS (default 3).
 /// </summary>
 public sealed class ScrapingApiPageSource(HttpClient http, string apiKey, string urlTemplate, int maxAttempts = 3)
     : IThreadPageSource
@@ -26,10 +16,7 @@ public sealed class ScrapingApiPageSource(HttpClient http, string apiKey, string
     {
         var key = Environment.GetEnvironmentVariable("SCRAPER_API_KEY")
                   ?? throw new InvalidOperationException("SCRAPER_API_KEY is not set.");
-        // Defaults to ZenRows (permanent free tier, Cloudflare-solving included).
-        // wait_for=.post_body makes ZenRows hold until the posts render, so it can't
-        // return a truncated head-only page (which happened intermittently).
-        // Override SCRAPER_URL_TEMPLATE to switch providers.
+        // wait_for=.post_body holds until posts render, avoiding truncated head-only pages.
         var template = Environment.GetEnvironmentVariable("SCRAPER_URL_TEMPLATE")
                        ?? "https://api.zenrows.com/v1/?apikey={KEY}&url={URL}&js_render=true&premium_proxy=true&wait_for=.post_body";
         var attempts = int.TryParse(Environment.GetEnvironmentVariable("SCRAPER_MAX_ATTEMPTS"), out var a) ? a : 3;

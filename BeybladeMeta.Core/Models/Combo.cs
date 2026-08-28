@@ -1,9 +1,8 @@
 namespace BeybladeMeta.Core.Models;
 
 /// <summary>
-/// A single Beyblade X combo. Ratchet is null for combos whose line carries no
-/// ratchet code (e.g. "Valor Bison Glide"). AssistBlade covers CX-style lines
-/// where an assist part sits between blade and ratchet.
+/// A Beyblade X combo. Ratchet is null for ratchet-less combos ("Valor Bison Glide");
+/// AssistBlade is the CX part that sits between blade and ratchet.
 /// </summary>
 public sealed record Combo(string Blade, string? AssistBlade, string? Ratchet, string Bit)
 {

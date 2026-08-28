@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BeybladeMeta.Core.Ingestion;
 
-/// <summary>Abstraction over how thread pages are fetched (HttpClient, Playwright, saved files).</summary>
+/// <summary>Abstraction over how thread pages are fetched.</summary>
 public interface IThreadPageSource
 {
     Task<string> GetPageHtmlAsync(int page, CancellationToken ct = default);
@@ -16,11 +16,10 @@ public sealed record CatchUpOptions(int MinBackfillPage = 100, TimeSpan? PageDel
 }
 
 /// <summary>
-/// One catch-up pass over the thread, always moving forward through pages.
-/// First run (empty database): indexes from <see cref="CatchUpOptions.MinBackfillPage"/>
-/// (default 100, ~Feb 2) to the current last page. Later runs: resume from the last
-/// indexed page — re-reading it because the last page keeps gaining posts. Ingestion
-/// is idempotent per forum post, so re-reading a page only adds genuinely new posts.
+/// One forward pass over the thread. First run indexes from
+/// <see cref="CatchUpOptions.MinBackfillPage"/> to the last page; later runs resume
+/// from the last indexed page, re-reading it since it keeps gaining posts. Ingestion
+/// is idempotent per post, so re-reading only adds new posts.
 /// </summary>
 public sealed class CatchUpIndexer(
     MetaDbContext db,
@@ -36,9 +35,8 @@ public sealed class CatchUpIndexer(
         if (startPage < options.MinBackfillPage)
             startPage = options.MinBackfillPage;
 
-        // Fetch the start page to learn the real last page from its pagination bar.
-        // (Requesting an out-of-range page clamps to page 1 on this forum, so the old
-        // "?page=999999" probe silently read page-1 content — do not use it.)
+        // Fetch the start page to learn the last page from its pagination bar.
+        // (An out-of-range page clamps to page 1 here, so don't probe with a huge number.)
         var firstHtml = await source.GetPageHtmlAsync(startPage, ct);
         var lastPage = MyBbPostExtractor.GetLastPageNumber(firstHtml);
         if (startPage > lastPage)

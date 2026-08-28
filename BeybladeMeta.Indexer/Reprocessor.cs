@@ -4,9 +4,8 @@ using BeybladeMeta.Core.Parsing;
 namespace BeybladeMeta.Indexer;
 
 /// <summary>
-/// Rebuilds appearances.json/unmatched.json from the existing exports using the
-/// current parser — recovers combos the old parser missed without re-scraping.
-/// Post dates are not in the exports, so weeks stay empty until a real re-index.
+/// Rebuilds the JSON exports with the current parser — re-parsing recovers combos
+/// and merges bit forms without re-scraping. Existing dates are carried through.
 /// </summary>
 public static class Reprocessor
 {

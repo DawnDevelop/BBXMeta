@@ -1,12 +1,9 @@
 namespace BeybladeMeta.Core.Parsing;
 
 /// <summary>
-/// Beyblade X combos are parsed structurally (anchored on the ratchet code), so
-/// no blade catalog is needed. This vocabulary supports three narrow jobs:
-/// splitting a CX assist part off the blade name, recognizing ratchet-less combos
-/// (unique blades like "BulletGriffon Hexa") by their trailing bit, and — most
-/// importantly — canonicalizing bit names so abbreviations merge with full names
-/// ("Fb"/"FreeBall"/"Free Ball" → "Free Ball", "H" → "Hexa").
+/// Supports the parser's non-structural needs: splitting a CX assist part off the
+/// blade, recognizing ratchet-less combos by their trailing bit, and canonicalizing
+/// bit names so abbreviations merge with full names ("Fb"/"FreeBall" → "Free Ball").
 /// </summary>
 public sealed class PartsVocabulary
 {
