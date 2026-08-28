@@ -7,9 +7,14 @@ publish/
 *.db
 *.db-shm
 *.db-wal
-data/beyblade-meta.db
+# ...but DO persist the indexer's state DB so CI runs resume from the last
+# indexed page instead of re-backfilling from page 100 every time.
+!data/beyblade-meta.db
 scratch-test/
 .chrome-profile/
+
+## Generated leaderboard JSON copied into the WASM app for local testing
+BeybladeMeta.Wasm/wwwroot/data/
 
 ## IDE
 .vs/

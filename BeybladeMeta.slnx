@@ -1,4 +1,8 @@
 <Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="data/appearances.json" />
+    <File Path="data/unmatched.json" />
+  </Folder>
   <Project Path="BeybladeMeta.Core/BeybladeMeta.Core.csproj" />
   <Project Path="BeybladeMeta.Indexer/BeybladeMeta.Indexer.csproj" />
   <Project Path="BeybladeMeta.Tests/BeybladeMeta.Tests.csproj" />

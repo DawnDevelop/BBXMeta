@@ -18,6 +18,9 @@ concurrency:
 
 jobs:
   index:
+    # Only fetch new pages on the schedule or a manual run — not on every code push
+    # (which would waste credits and, on a fresh checkout, re-index from page 100).
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
