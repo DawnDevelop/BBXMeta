@@ -34,6 +34,47 @@ public class BladeCanonicalizerTests
     }
 
     [Fact]
+    public void Typos_fold_into_the_established_blade()
+    {
+        var blades = new List<string>();
+        blades.AddRange(Enumerable.Repeat("CobaltDragoon", 50));
+        blades.Add("CobaltDraggon");  // insertion
+        blades.Add("CobaltDrgoon");   // deletion
+        blades.Add("Colbalt Dragoon"); // transposition (+ space)
+
+        var map = BladeCanonicalizer.BuildMap(blades);
+
+        Assert.Equal("CobaltDragoon", map["CobaltDraggon"]);
+        Assert.Equal("CobaltDragoon", map["CobaltDrgoon"]);
+        Assert.Equal("CobaltDragoon", map["Colbalt Dragoon"]);
+    }
+
+    [Fact]
+    public void Part_code_difference_is_not_treated_as_a_typo()
+    {
+        // "EmperorBlast W" vs "EmperorBlast H" differ by a standalone part code, not a misspelling.
+        var blades = new List<string>();
+        blades.AddRange(Enumerable.Repeat("EmperorBlast H", 30));
+        blades.Add("EmperorBlast W");
+
+        var map = BladeCanonicalizer.BuildMap(blades);
+
+        Assert.NotEqual(map["EmperorBlast H"], map["EmperorBlast W"]);
+    }
+
+    [Fact]
+    public void Distinct_established_blades_are_never_fuzzy_merged()
+    {
+        var blades = new List<string>();
+        blades.AddRange(Enumerable.Repeat("ImpactDrake", 40));
+        blades.AddRange(Enumerable.Repeat("ShelterDrake", 40));
+
+        var map = BladeCanonicalizer.BuildMap(blades);
+
+        Assert.NotEqual(map["ImpactDrake"], map["ShelterDrake"]);
+    }
+
+    [Fact]
     public void Build_map_picks_the_most_frequent_spelling_as_canonical()
     {
         // 3× WyvernHover, 2× "Hover Wyvern", 1× HoverWyvern → all map to WyvernHover

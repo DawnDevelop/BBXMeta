@@ -54,6 +54,9 @@ public static partial class BladeCanonicalizer
             if (Aliases.TryGetValue(Key(s), out var target) && counts.ContainsKey(target))
                 dsu.Union(s, target);
 
+        // Fuzzy pass: fold a rare spelling into an established blade one typo away.
+        FuzzyMerge(dsu, spellings, counts);
+
         // Canonical per group = most frequent spelling (ties broken deterministically).
         var canonicalByRoot = spellings
             .GroupBy(dsu.Find)
@@ -62,6 +65,72 @@ public static partial class BladeCanonicalizer
                 g => g.OrderByDescending(s => counts[s]).ThenBy(s => s, StringComparer.Ordinal).First());
 
         return spellings.ToDictionary(s => s, s => canonicalByRoot[dsu.Find(s)]);
+    }
+
+    // Thresholds for the fuzzy typo pass.
+    private const int RareMax = 3;        // a spelling this rare may be a typo
+    private const int EstablishedMin = 20; // …of a blade at least this common
+    private const int MinLetters = 7;      // skip short names (coincidental 1-edit neighbours)
+
+    /// <summary>
+    /// Merge a rare spelling into an established blade when their letters are one edit
+    /// apart (insertion/deletion/substitution/transposition). Guards avoid the known
+    /// false positives (e.g. "EmperorBlast W" vs "…H", where the difference is a
+    /// standalone part code, not a misspelling).
+    /// </summary>
+    private static void FuzzyMerge(Dsu dsu, List<string> spellings, Dictionary<string, int> counts)
+    {
+        int GroupCount(string s) => spellings.Where(x => dsu.Find(x) == dsu.Find(s)).Sum(x => counts[x]);
+        var established = spellings.Where(s => GroupCount(s) >= EstablishedMin).ToList();
+
+        foreach (var rare in spellings.Where(s => counts[s] <= RareMax && !HasShortToken(s)))
+        {
+            var rk = LetterKey(rare);
+            if (rk.Length < MinLetters)
+                continue;
+            foreach (var est in established)
+            {
+                if (dsu.Find(est) == dsu.Find(rare) || HasShortToken(est))
+                    continue;
+                if (Math.Abs(LetterKey(est).Length - rk.Length) <= 1 && OneEditApart(rk, LetterKey(est)))
+                {
+                    dsu.Union(rare, est);
+                    break;
+                }
+            }
+        }
+    }
+
+    // A standalone 1–2 letter token is a part code (W, H, S…), not part of a blade name.
+    private static bool HasShortToken(string blade) =>
+        blade.Split(' ', StringSplitOptions.RemoveEmptyEntries).Any(t => t.Length <= 2);
+
+    /// <summary>True if a and b are within one edit (Damerau/OSA distance ≤ 1).</summary>
+    private static bool OneEditApart(string a, string b)
+    {
+        if (a == b) return true;
+        int la = a.Length, lb = b.Length;
+        if (Math.Abs(la - lb) > 1) return false;
+
+        if (la == lb)
+        {
+            int diff = 0, first = -1;
+            for (int i = 0; i < la; i++)
+                if (a[i] != b[i]) { if (++diff > 2) return false; if (first < 0) first = i; }
+            if (diff <= 1) return true;
+            // exactly two diffs → allow only an adjacent transposition
+            return diff == 2 && first + 1 < la && a[first] == b[first + 1] && a[first + 1] == b[first];
+        }
+
+        // lengths differ by one → check for a single insertion/deletion
+        var (shorter, longer) = la < lb ? (a, b) : (b, a);
+        int si = 0, li = 0; bool skipped = false;
+        while (si < shorter.Length && li < longer.Length)
+        {
+            if (shorter[si] == longer[li]) { si++; li++; }
+            else { if (skipped) return false; skipped = true; li++; }
+        }
+        return true;
     }
 
     private static void LinkAll(Dsu dsu, IEnumerable<string> group)
