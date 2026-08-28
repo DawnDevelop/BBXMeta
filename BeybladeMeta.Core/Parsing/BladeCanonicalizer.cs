@@ -19,12 +19,20 @@ public static partial class BladeCanonicalizer
     private static partial Regex NonLetters();
 
     /// <summary>Explicit synonym map: token-sort Key(variant) → canonical spelling.</summary>
-    // Takara Tomy (JP) ↔ Hasbro (Western) name pairs for the same blade.
+    // Takara Tomy (JP) ↔ Hasbro (Western) name pairs for the same blade, where the
+    // descriptor word (not just word order) differs. Pure word-order swaps are already
+    // merged by the token-sort key and need no entry. Keyed by token-sort Key(Hasbro name).
     public static readonly IReadOnlyDictionary<string, string> Aliases = new Dictionary<string, string>
     {
-        ["wand wizard"] = "WizardRod",    // Hasbro Wand Wizard = TT Wizard Rod
-        ["sterling wolf"] = "SilverWolf", // Hasbro Sterling Wolf = TT Silver Wolf
-        ["phoenix soar"] = "PhoenixWing", // Hasbro Soar Phoenix = TT Phoenix Wing
+        ["wand wizard"] = "WizardRod",      // Wand Wizard = Wizard Rod
+        ["sterling wolf"] = "SilverWolf",   // Sterling Wolf = Silver Wolf
+        ["phoenix soar"] = "PhoenixWing",   // Soar Phoenix = Phoenix Wing
+        ["hammer incendio"] = "HellsHammer", // Hammer Incendio = Hells Hammer
+        ["helm knight"] = "KnightShield",   // Helm Knight = Knight Shield
+        ["keel shark"] = "SharkEdge",       // Keel Shark = Shark Edge
+        ["ptera talon"] = "PteraSwing",     // Talon Ptera = Ptera Swing
+        ["garuda scarlet"] = "CrimsonGaruda", // Scarlet Garuda = Crimson Garuda
+        ["obsidian shell"] = "BlackShell",  // Obsidian Shell = Black Shell
     };
 
     /// <summary>Word-order/spacing-invariant key: words lowercased and alphabetised.</summary>
