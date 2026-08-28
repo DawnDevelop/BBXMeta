@@ -31,21 +31,26 @@ public sealed class CatchUpIndexer(
 {
     public async Task RunAsync(CancellationToken ct = default)
     {
-        // A huge page number makes MyBB clamp to the thread's real last page.
-        var probeHtml = await source.GetPageHtmlAsync(999999, ct);
-        var lastPage = MyBbPostExtractor.GetLastPageNumber(probeHtml);
-
         var lastIndexed = await db.Posts.MaxAsync(p => (int?)p.Page, ct);
-        var startPage = lastIndexed is null
-            ? Math.Min(options.MinBackfillPage, lastPage)  // first run: floor, clamped if thread is shorter
-            : Math.Max(lastIndexed.Value, options.MinBackfillPage); // resume: re-read the last indexed page
+        var startPage = lastIndexed ?? options.MinBackfillPage;
+        if (startPage < options.MinBackfillPage)
+            startPage = options.MinBackfillPage;
+
+        // Fetch the start page to learn the real last page from its pagination bar.
+        // (Requesting an out-of-range page clamps to page 1 on this forum, so the old
+        // "?page=999999" probe silently read page-1 content — do not use it.)
+        var firstHtml = await source.GetPageHtmlAsync(startPage, ct);
+        var lastPage = MyBbPostExtractor.GetLastPageNumber(firstHtml);
+        if (startPage > lastPage)
+        {
+            // The floor/last-indexed page overshot a shorter-than-expected thread.
+            startPage = lastPage;
+            firstHtml = await source.GetPageHtmlAsync(startPage, ct);
+        }
 
         log?.Invoke(lastIndexed is null
             ? $"First run: backfilling pages {startPage}–{lastPage} ({options.EffectiveConcurrency}x parallel)."
             : $"Catch-up: pages {startPage}–{lastPage} (last indexed was {lastIndexed}).");
-
-        if (startPage > lastPage)
-            return;
 
         var pages = Enumerable.Range(startPage, lastPage - startPage + 1).ToList();
 
@@ -54,8 +59,8 @@ public sealed class CatchUpIndexer(
         var gate = new SemaphoreSlim(options.EffectiveConcurrency);
         async Task<string> FetchAsync(int page)
         {
-            if (page == lastPage)
-                return probeHtml; // already fetched by the probe
+            if (page == startPage)
+                return firstHtml; // already fetched to discover the last page
             await gate.WaitAsync(ct);
             try { return await source.GetPageHtmlAsync(page, ct); }
             finally { gate.Release(); }
