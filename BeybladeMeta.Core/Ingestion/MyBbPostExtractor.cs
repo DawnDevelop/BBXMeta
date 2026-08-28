@@ -1,8 +1,11 @@
+using System.Globalization;
+using System.Text.RegularExpressions;
 using HtmlAgilityPack;
 
 namespace BeybladeMeta.Core.Ingestion;
 
-public sealed record ForumPost(string ForumPostId, string Author, string Text, DateTime? PostedAt);
+// Author names are intentionally not captured — only the post's content and date.
+public sealed record ForumPost(string ForumPostId, string Text, DateTime? PostedAt);
 
 /// <summary>
 /// Extracts individual posts from a MyBB thread page (worldbeyblade.org runs MyBB).
@@ -31,12 +34,9 @@ public static class MyBbPostExtractor
                 strip.Remove();
 
             var postContainer = FindPostContainer(body);
-            var author = postContainer?.SelectSingleNode(".//*[contains(@class,'largetext')]//a")?.InnerText.Trim()
-                         ?? postContainer?.SelectSingleNode(".//*[contains(@class,'post_author')]//a")?.InnerText.Trim()
-                         ?? "(unknown)";
             var postedAt = ParsePostDate(postContainer?.SelectSingleNode(".//*[contains(@class,'post_date')]"));
 
-            posts.Add(new ForumPost(pid["pid_".Length..], HtmlEntity.DeEntitize(author), ToPlainText(body), postedAt));
+            posts.Add(new ForumPost(pid["pid_".Length..], ToPlainText(body), postedAt));
         }
         return posts;
     }
@@ -63,34 +63,37 @@ public static class MyBbPostExtractor
         return numbers.DefaultIfEmpty(1).Max();
     }
 
+    private static readonly Regex DateRegex =
+        new(@"(?<mon>[A-Za-z]{3,9})\.?\s+(?<day>\d{1,2}),\s*(?<year>\d{4})", RegexOptions.Compiled);
+
     /// <summary>
-    /// MyBB renders dates like "07-15-2026, 03:12 PM"; recent posts use relative
-    /// forms ("Today", "Yesterday", "2 hours ago") which resolve against 'now'.
+    /// This forum renders post dates as "Jan. 09, 2024&nbsp;&nbsp;2:26 PM" inside an
+    /// anchor within the post_date span; recent posts use "Today"/"Yesterday"/"… ago".
     /// </summary>
     private static DateTime? ParsePostDate(HtmlNode? dateNode)
     {
         if (dateNode is null)
             return null;
-        // First text segment only — MyBB appends edit info in child spans.
-        var text = HtmlEntity.DeEntitize(dateNode.ChildNodes
-            .Where(n => n.NodeType == HtmlNodeType.Text)
-            .Select(n => n.InnerText.Trim())
-            .FirstOrDefault(t => t.Length > 0) ?? "").Trim().TrimEnd(',');
+        // Full inner text (the date sits inside a child <a>), nbsp normalized to spaces.
+        var text = HtmlEntity.DeEntitize(dateNode.InnerText).Replace(' ', ' ').Trim();
+        if (text.Length == 0)
+            return null;
 
         if (text.StartsWith("Today", StringComparison.OrdinalIgnoreCase) ||
             text.Contains("ago", StringComparison.OrdinalIgnoreCase) ||
-            text.Contains("minute", StringComparison.OrdinalIgnoreCase))
+            text.Contains("minute", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("hour", StringComparison.OrdinalIgnoreCase))
             return DateTime.Today;
         if (text.StartsWith("Yesterday", StringComparison.OrdinalIgnoreCase))
             return DateTime.Today.AddDays(-1);
 
-        var datePart = text.Split(',')[0].Trim();
-        return DateTime.TryParseExact(datePart, "MM-dd-yyyy",
-                   System.Globalization.CultureInfo.InvariantCulture,
-                   System.Globalization.DateTimeStyles.None, out var exact)
-            ? exact
-            : DateTime.TryParse(datePart, System.Globalization.CultureInfo.InvariantCulture,
-                System.Globalization.DateTimeStyles.None, out var loose) ? loose : null;
+        var m = DateRegex.Match(text);
+        if (!m.Success)
+            return null;
+        var normalized = $"{m.Groups["mon"].Value} {m.Groups["day"].Value} {m.Groups["year"].Value}";
+        string[] formats = ["MMM d yyyy", "MMMM d yyyy"];
+        return DateTime.TryParseExact(normalized, formats, CultureInfo.InvariantCulture,
+            DateTimeStyles.None, out var parsed) ? parsed : null;
     }
 
     private static HtmlNode? FindPostContainer(HtmlNode body)

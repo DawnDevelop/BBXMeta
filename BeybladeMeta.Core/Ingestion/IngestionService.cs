@@ -27,8 +27,6 @@ public sealed class IngestionService(MetaDbContext db, PostParser parser)
             {
                 ForumPostId = post.ForumPostId,
                 Page = page,
-                Author = post.Author,
-                RawText = post.Text,
                 PostedAt = post.PostedAt,
             };
             db.Posts.Add(entity);
@@ -41,7 +39,6 @@ public sealed class IngestionService(MetaDbContext db, PostParser parser)
                     {
                         Post = entity,
                         Placement = placement.Placement,
-                        Player = placement.Player,
                         Blade = combo.Blade,
                         AssistBlade = combo.AssistBlade,
                         Ratchet = combo.Ratchet,

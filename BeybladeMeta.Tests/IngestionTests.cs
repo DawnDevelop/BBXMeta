@@ -8,11 +8,13 @@ namespace BeybladeMeta.Tests;
 
 public class IngestionTests : IDisposable
 {
+    // Mirrors the real worldbeyblade.org MyBB markup: date inside an <a> in the
+    // post_date span, format "Jan. 09, 2024"; author lives in a username span.
     private const string PageHtml = """
         <html><body>
         <div class="post classic" id="post_900001">
-          <div class="post_author"><strong><span class="largetext"><a href="/User-Reporter">Reporter</a></span></strong></div>
-          <div class="post_head"><span class="post_date">08-17-2026, 03:12 PM <span class="post_edit">(edited)</span></span></div>
+          <div class="author_information"><span class="username group-id-20"><a href="/User-Reporter">Reporter</a></span></div>
+          <div class="post_head"><span class="post_date"><a href="#pid900001" title="Time Posted">Aug. 17, 2026&nbsp;&nbsp;3:12 PM</a></span></div>
           <div class="post_body scaleimages" id="pid_900001">
             Tournament results!<br>
             1st @"Blader001"<br>
@@ -25,7 +27,7 @@ public class IngestionTests : IDisposable
           </div>
         </div>
         <div class="post classic" id="post_900002">
-          <div class="post_author"><strong><span class="largetext"><a href="/User-Quoter">Quoter</a></span></strong></div>
+          <div class="author_information"><span class="username group-id-20"><a href="/User-Quoter">Quoter</a></span></div>
           <div class="post_body scaleimages" id="pid_900002">
             <blockquote>1st SomeoneElse<br>WizardRod 1-60Hexa</blockquote>
             Congrats everyone, great meta discussion.
@@ -61,11 +63,11 @@ public class IngestionTests : IDisposable
         Assert.Equal(0, report.UnmatchedLines);
 
         var ingestedPost = await db.Posts.SingleAsync();
-        Assert.Equal(new DateTime(2026, 8, 17), ingestedPost.PostedAt);
+        Assert.Equal(new DateTime(2026, 8, 17), ingestedPost.PostedAt); // date parsed from "Aug. 17, 2026"
 
         var appearances = await db.Appearances.ToListAsync();
-        Assert.Equal(3, appearances.Count(a => a.Placement == 1 && a.Player == "Blader001"));
-        Assert.Equal(2, appearances.Count(a => a.Placement == 2 && a.Player == "Blader002"));
+        Assert.Equal(3, appearances.Count(a => a.Placement == 1));
+        Assert.Equal(2, appearances.Count(a => a.Placement == 2));
         // The quoted WizardRod result must not have been double-counted
         Assert.Equal(1, appearances.Count(a => a.Display == "WizardRod 1-60Hexa"));
     }

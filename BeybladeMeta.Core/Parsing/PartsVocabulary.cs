@@ -1,93 +1,63 @@
-using System.Text.Json;
-
 namespace BeybladeMeta.Core.Parsing;
 
 /// <summary>
-/// Canonical part names, matched case- and space-insensitively so that
-/// "Wizard Rod", "WizardRod" and "wizardrod" all resolve to the same entry.
-/// The seed below covers the parts seen in sample posts plus common releases;
-/// the full list is meant to be synced from the Beyblade Wiki and loaded via FromJson.
+/// Beyblade X combos are parsed structurally (anchored on the ratchet code), so
+/// no blade catalog is needed. This vocabulary only supports two narrow jobs:
+/// splitting a CX assist part off the blade name, and recognizing ratchet-less
+/// combos (unique blades like "BulletGriffon Hexa") by their trailing bit.
 /// </summary>
 public sealed class PartsVocabulary
 {
-    private readonly Dictionary<string, string> _blades;   // normalized -> canonical
-    private readonly Dictionary<string, string> _assists;
-    private readonly Dictionary<string, string> _bits;
-    private readonly List<string> _bladeKeysByLengthDesc;
+    private readonly Dictionary<string, string> _bits; // normalized -> canonical (spaced) form
+    private readonly HashSet<string> _assists;         // normalized assist-blade names
+    private readonly int _maxBitWords;
 
-    public PartsVocabulary(IEnumerable<string> blades, IEnumerable<string> assistBlades, IEnumerable<string> bits)
+    public PartsVocabulary(IEnumerable<string> bits, IEnumerable<string> assistBlades)
     {
-        _blades = ToLookup(blades);
-        _assists = ToLookup(assistBlades);
-        _bits = ToLookup(bits);
-        _bladeKeysByLengthDesc = _blades.Keys.OrderByDescending(k => k.Length).ToList();
+        _bits = bits.Distinct().ToDictionary(Normalize, b => b);
+        _assists = assistBlades.Select(Normalize).ToHashSet();
+        _maxBitWords = _bits.Keys.Count == 0 ? 1 : bits.Select(b => b.Split(' ').Length).Max();
     }
 
-    public static string Normalize(string s) => s.Replace(" ", "").Replace("’", "'").ToLowerInvariant().Trim();
+    public static string Normalize(string s) =>
+        s.Replace(" ", "").Replace(" ", "").ToLowerInvariant().Trim();
 
-    private static Dictionary<string, string> ToLookup(IEnumerable<string> names) =>
-        names.Distinct().ToDictionary(Normalize, n => n);
+    public bool IsAssist(string token) => _assists.Contains(Normalize(token));
 
-    /// <summary>Longest canonical blade whose normalized name is a prefix of <paramref name="normalizedText"/>.</summary>
-    public (string Canonical, string Remainder)? MatchBladePrefix(string normalizedText)
+    /// <summary>
+    /// If the trailing 1..N tokens form a known bit, returns (bladePart, canonicalBit);
+    /// used only for ratchet-less lines. Null when no trailing bit is recognized.
+    /// </summary>
+    public (string BladePart, string Bit)? SplitTrailingBit(string text)
     {
-        foreach (var key in _bladeKeysByLengthDesc)
+        var tokens = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        for (var take = Math.Min(_maxBitWords, tokens.Length); take >= 1; take--)
         {
-            if (normalizedText.StartsWith(key, StringComparison.Ordinal))
-                return (_blades[key], normalizedText[key.Length..]);
+            var candidate = string.Join("", tokens[^take..]);
+            if (_bits.TryGetValue(Normalize(candidate), out var canonical))
+            {
+                var bladePart = string.Join(' ', tokens[..^take]);
+                if (bladePart.Length > 0)
+                    return (bladePart, canonical);
+            }
         }
         return null;
     }
 
-    public string? MatchAssist(string normalizedText) =>
-        _assists.TryGetValue(normalizedText, out var canonical) ? canonical : null;
-
-    public string? MatchBit(string normalizedText) =>
-        _bits.TryGetValue(normalizedText, out var canonical) ? canonical : null;
-
-    public static PartsVocabulary FromJson(Stream json)
-    {
-        var doc = JsonSerializer.Deserialize<VocabularyJson>(json, JsonOptions)
-                  ?? throw new InvalidDataException("Empty parts vocabulary JSON.");
-        return new PartsVocabulary(doc.Blades, doc.AssistBlades ?? [], doc.Bits);
-    }
-
-    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
-
-    private sealed record VocabularyJson(List<string> Blades, List<string>? AssistBlades, List<string> Bits);
-
     public static PartsVocabulary CreateDefault() => new(
-        blades:
+        bits:
         [
-            // From observed thread posts
-            "MeteorDragoon", "SharkScale", "WizardRod", "CobaltDragoon", "Valor Bison",
-            "EmperorWhip", "AeroPegasus",
-            // Common BBX releases
-            "DranSword", "DranDagger", "DranBuster", "DranBrave",
-            "HellsScythe", "HellsChain", "HellsHammer",
-            "WizardArrow", "KnightShield", "KnightLance", "KnightMail",
-            "SharkEdge", "PhoenixWing", "PhoenixFeather", "PhoenixRudder",
-            "CobaltDrake", "ViperTail", "RhinoHorn", "UnicornSting",
-            "SphinxCowl", "TyrannoBeat", "WhaleWave", "PteraSwing",
-            "ShelterDrake", "BlackShell", "WeissTiger", "CrimsonGaruda",
-            "ShinobiShadow", "GhostCircle", "LeonClaw", "ScorpioSpear",
-            "SilverWolf", "SamuraiSaber", "KnifeShinobi", "BearScratch",
-            "FoxBrush", "TuskMammoth", "HoverWyvern", "YellowDragster",
-            "ImpactDrake", "TalonPtera", "SavageBear",
+            "Accel", "Ball", "Bound Spike", "Cyclone", "Disk Ball", "Dot", "Elevate",
+            "Flat", "Free Ball", "Free Flat", "Gear Ball", "Gear Flat", "Gear Needle",
+            "Gear Point", "Gear Rush", "Gear Unite", "Glide", "Hexa", "High Needle",
+            "High Taper", "Jolt", "Kick", "Level", "Low Flat", "Low Orb", "Low Rush",
+            "Merge", "Metal Needle", "Narrow", "Needle", "Orb", "Point", "Quake",
+            "Rubber Accel", "Rush", "Spike", "Taper", "Trans Kick", "Trans Point",
+            "Under Flat", "Under Needle", "Unite", "Vortex", "Wall Ball", "Wall Wedge",
+            "Wedge", "Wide Ball", "Yielding", "Zap",
         ],
         assistBlades:
         [
-            // From observed thread posts; CX assist parts sit between blade and ratchet
-            "OuterWheel",
-        ],
-        bits:
-        [
-            // From observed thread posts
-            "Level", "Rush", "Hexa", "Elevate", "Glide", "Unite", "Free Ball",
-            // Common BBX bits
-            "Flat", "Ball", "Point", "Needle", "Taper", "High Taper", "Low Flat",
-            "Orb", "Dot", "Quake", "Spike", "Cyclone", "Accel", "Vortex",
-            "Gear Flat", "Gear Ball", "Gear Point", "Gear Needle", "Gear Rush",
-            "Metal Needle", "Bound Spike", "Disk Ball", "Trans Point",
+            "OuterWheel", "Heavy", "Bumper", "Wheel", "Assault", "Round", "Massive",
         ]);
 }

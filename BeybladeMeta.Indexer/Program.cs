@@ -48,7 +48,7 @@ static async Task ExportAsync(MetaDbContext db, string outDir)
         JsonSerializer.Serialize(appearances, jsonOptions));
 
     var unmatched = await db.Unmatched
-        .Select(u => new { u.Post!.Page, u.Post!.Author, u.Placement, u.Line })
+        .Select(u => new { u.Post!.Page, u.Placement, u.Line })
         .ToListAsync();
     await File.WriteAllTextAsync(Path.Combine(outDir, "unmatched.json"),
         JsonSerializer.Serialize(unmatched, jsonOptions));

@@ -26,13 +26,11 @@ else
     <MudTable Items="_entries" Hover="true" Dense="true" Striped="true" Elevation="2">
         <HeaderContent>
             <MudTh>Page</MudTh>
-            <MudTh>Post author</MudTh>
             <MudTh>Placement</MudTh>
             <MudTh>Line</MudTh>
         </HeaderContent>
         <RowTemplate>
             <MudTd DataLabel="Page">@context.Page</MudTd>
-            <MudTd DataLabel="Author">@context.Author</MudTd>
             <MudTd DataLabel="Placement">@context.Placement</MudTd>
             <MudTd DataLabel="Line"><code>@context.Line</code></MudTd>
         </RowTemplate>
@@ -43,7 +41,7 @@ else
 }
 
 @code {
-    public sealed record Entry(int Page, string Author, int Placement, string Line);
+    public sealed record Entry(int Page, int Placement, string Line);
 
     private List<Entry>? _entries;
     private string? _error;
