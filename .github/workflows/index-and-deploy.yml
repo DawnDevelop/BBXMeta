@@ -42,6 +42,7 @@ jobs:
           INDEXER_DB: data/beyblade-meta.db
           INDEXER_OUT: data
           INDEXER_MIN_PAGE: 100
+          INDEXER_CONCURRENCY: 5
 
       - name: Commit updated data
         if: always()

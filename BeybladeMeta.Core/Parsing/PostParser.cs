@@ -71,6 +71,9 @@ public sealed partial class PostParser(PartsVocabulary vocabulary)
         return new ParsedPost(placements, unmatched);
     }
 
+    /// <summary>Parse a single combo line in isolation (used to reprocess already-exported lines).</summary>
+    public Combo? TryParseCombo(string line) => TryParseComboLine(line.Trim());
+
     private Combo? TryParseComboLine(string line)
     {
         var cleaned = Parenthetical().Replace(line, "").Trim();

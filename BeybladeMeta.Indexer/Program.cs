@@ -9,6 +9,14 @@ using Microsoft.EntityFrameworkCore;
 var dbPath = Environment.GetEnvironmentVariable("INDEXER_DB") ?? "data/beyblade-meta.db";
 var outDir = Environment.GetEnvironmentVariable("INDEXER_OUT") ?? "data";
 var minPage = int.TryParse(Environment.GetEnvironmentVariable("INDEXER_MIN_PAGE"), out var mp) ? mp : 100;
+var concurrency = int.TryParse(Environment.GetEnvironmentVariable("INDEXER_CONCURRENCY"), out var cc) ? cc : 5;
+
+// Offline data fix: re-parse existing exports with the current parser (no scraping).
+if (Environment.GetEnvironmentVariable("REPROCESS") == "1")
+{
+    Reprocessor.Run(outDir);
+    return 0;
+}
 
 Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(dbPath))!);
 Directory.CreateDirectory(outDir);
@@ -23,7 +31,7 @@ try
 {
     using var http = new HttpClient();
     var source = ScrapingApiPageSource.FromEnvironment(http);
-    await new CatchUpIndexer(db, ingestion, source, new CatchUpOptions(minPage), Console.WriteLine).RunAsync();
+    await new CatchUpIndexer(db, ingestion, source, new CatchUpOptions(minPage, Concurrency: concurrency), Console.WriteLine).RunAsync();
 }
 catch (Exception ex)
 {
