@@ -15,9 +15,10 @@ public static partial class BladeCanonicalizer
     private static partial Regex Words();
 
     /// <summary>Explicit synonym map: any spelling (token-sort key) → canonical spelling.</summary>
+    // Keyed by token-sort Key(variant) → canonical spelling.
     public static readonly IReadOnlyDictionary<string, string> Aliases = new Dictionary<string, string>
     {
-        // e.g. ["wand wizard"] = "Wizard Rod",
+        ["wand wizard"] = "WizardRod", // "Wand Wizard" = Wizard Rod (rod/wand synonym)
     };
 
     public static string Key(string blade) =>

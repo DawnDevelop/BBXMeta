@@ -26,8 +26,8 @@ else
     <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-3" Spacing="3">
         <MudAutocomplete T="string" Value="_search" ValueChanged="OnSearchChanged" Label="Search blade"
                          SearchFunc="SearchBlades" Clearable="true" ResetValueOnEmptyText="true"
-                         CoerceValue="true" Variant="Variant.Outlined" Dense="true"
-                         AdornmentIcon="@Icons.Material.Filled.Search" Style="max-width: 18rem;" />
+                         CoerceValue="true" DebounceInterval="200" MaxItems="20" Variant="Variant.Outlined"
+                         Dense="true" AdornmentIcon="@Icons.Material.Filled.Search" Style="max-width: 18rem;" />
         <MudSelect T="string" Value="_selectedWindow" ValueChanged="OnWindowChanged" Label="Time range"
                    Variant="Variant.Outlined" Dense="true" Style="max-width: 14rem;">
             @foreach (var w in Windows)
@@ -151,48 +151,44 @@ else
     private BladeRow? _selected;
     private readonly HashSet<string> _expanded = [];
 
-    private IEnumerable<Appearance> Filtered
+    // Per-window results, recomputed only when the time range changes (not per keystroke).
+    private List<Appearance> _windowAppearances = [];
+    private List<BladeRow> _windowBlades = [];
+    private List<string> _bladeNames = [];
+
+    private void RecomputeWindow()
     {
-        get
-        {
-            var window = Windows.First(w => w.Key == _selectedWindow);
-            var cutoff = window.Cutoff(DateOnly.FromDateTime(DateTime.Today));
-            return cutoff is null
-                ? _all!
-                : _all!.Where(a => a.On is { } d && d >= cutoff);
-        }
+        var window = Windows.First(w => w.Key == _selectedWindow);
+        var cutoff = window.Cutoff(DateOnly.FromDateTime(DateTime.Today));
+        _windowAppearances = (cutoff is null ? _all! : _all!.Where(a => a.On is { } d && d >= cutoff)).ToList();
+
+        _windowBlades = _windowAppearances
+            .GroupBy(a => a.Blade)
+            .Select(g => new BladeRow(
+                g.Key,
+                g.Select(a => a.Display).Distinct().Count(),
+                g.Count(a => a.Placement == 1),
+                g.Count(a => a.Placement == 2),
+                g.Count(a => a.Placement == 3)))
+            .OrderByDescending(b => b.Score)
+            .Select((b, i) => b with { Rank = i + 1 })
+            .ToList();
+        _bladeNames = _windowBlades.Select(b => b.Blade).ToList();
     }
 
-    private int FilteredCount => Filtered.Count();
+    private int FilteredCount => _windowAppearances.Count;
 
-    private IEnumerable<BladeRow> Blades
-    {
-        get
-        {
-            // Rank by score over the whole time window first, so a searched blade keeps its true rank.
-            var ranked = Filtered
-                .GroupBy(a => a.Blade)
-                .Select(g => new BladeRow(
-                    g.Key,
-                    g.Select(a => a.Display).Distinct().Count(),
-                    g.Count(a => a.Placement == 1),
-                    g.Count(a => a.Placement == 2),
-                    g.Count(a => a.Placement == 3)))
-                .OrderByDescending(b => b.Score)
-                .Select((b, i) => b with { Rank = i + 1 });
-
-            return string.IsNullOrWhiteSpace(_search)
-                ? ranked
-                : ranked.Where(b => b.Blade.Contains(_search, StringComparison.OrdinalIgnoreCase));
-        }
-    }
+    // Cheap: filters the cached ~hundreds of ranked rows, keeping each blade's true rank.
+    private IEnumerable<BladeRow> Blades => string.IsNullOrWhiteSpace(_search)
+        ? _windowBlades
+        : _windowBlades.Where(b => b.Blade.Contains(_search, StringComparison.OrdinalIgnoreCase));
 
     private Task<IEnumerable<string>> SearchBlades(string? value, CancellationToken ct)
     {
-        var names = Filtered.Select(a => a.Blade).Distinct();
+        IEnumerable<string> names = _bladeNames;
         if (!string.IsNullOrWhiteSpace(value))
             names = names.Where(n => n.Contains(value, StringComparison.OrdinalIgnoreCase));
-        return Task.FromResult(names.OrderBy(n => n, StringComparer.OrdinalIgnoreCase).Take(20));
+        return Task.FromResult(names.Take(20));
     }
 
     private void OnSearchChanged(string? value)
@@ -201,7 +197,7 @@ else
         _expanded.Clear();
     }
 
-    private IEnumerable<ComboRow> CombosFor(string blade) => Filtered
+    private IEnumerable<ComboRow> CombosFor(string blade) => _windowAppearances
         .Where(a => a.Blade == blade)
         .GroupBy(a => a.Display)
         .Select(g => new ComboRow(
@@ -226,6 +222,7 @@ else
             // Until a re-index populates dates, the 4-week default would be empty — show all instead.
             if (!_all.Any(a => a.On is not null))
                 _selectedWindow = "all";
+            RecomputeWindow();
         }
         catch (HttpRequestException)
         {
@@ -238,6 +235,8 @@ else
     private void OnWindowChanged(string window)
     {
         _selectedWindow = window;
+        _search = null;
         _expanded.Clear();
+        RecomputeWindow();
     }
 }
