@@ -62,13 +62,13 @@ static async Task ExportAsync(MetaDbContext db, string outDir)
         .Select(a => new { a.Blade, a.AssistBlade, a.Ratchet, a.Bit, a.Placement, a.Post!.PostedAt })
         .ToListAsync();
 
-    // Merge blade spelling variants, then rebuild each display from the canonical blade.
+    // Merge spelling variants, group CX blades by main blade, then rebuild each display.
     var bladeMap = BladeCanonicalizer.BuildMap(rows.Select(r => r.Blade));
     var appearances = rows.Select(r =>
     {
-        var blade = bladeMap[r.Blade];
-        var display = new Combo(blade, r.AssistBlade, r.Ratchet, r.Bit).Display;
-        return new { Blade = blade, Display = display, r.Placement, Date = r.PostedAt?.ToString("yyyy-MM-dd") };
+        var (groupBlade, displayBladePart) = CxSystem.Resolve(bladeMap[r.Blade]);
+        var display = new Combo(displayBladePart, r.AssistBlade, r.Ratchet, r.Bit).Display;
+        return new { Blade = groupBlade, Display = display, r.Placement, Date = r.PostedAt?.ToString("yyyy-MM-dd") };
     });
     await File.WriteAllTextAsync(Path.Combine(outDir, "appearances.json"),
         JsonSerializer.Serialize(appearances, jsonOptions));

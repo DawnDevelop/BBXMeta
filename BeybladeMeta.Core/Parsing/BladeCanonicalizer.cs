@@ -18,7 +18,8 @@ public static partial class BladeCanonicalizer
     // Keyed by token-sort Key(variant) → canonical spelling.
     public static readonly IReadOnlyDictionary<string, string> Aliases = new Dictionary<string, string>
     {
-        ["wand wizard"] = "WizardRod", // "Wand Wizard" = Wizard Rod (rod/wand synonym)
+        ["wand wizard"] = "WizardRod",   // "Wand Wizard" = Wizard Rod (rod/wand synonym)
+        ["sterling wolf"] = "SilverWolf", // Sterling Wolf = Silver Wolf (same blade)
     };
 
     public static string Key(string blade) =>

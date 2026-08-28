@@ -90,8 +90,5 @@ public sealed class PartsVocabulary
             "Under Flat", "Under Needle", "Unite", "Vortex", "Wall Ball", "Wall Wedge",
             "Wedge", "Wide Ball", "Yielding", "Zap",
         ],
-        assistBlades:
-        [
-            "OuterWheel", "Heavy", "Bumper", "Wheel", "Assault", "Round", "Massive",
-        ]);
+        assistBlades: CxSystem.AssistBlades);
 }

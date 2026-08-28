@@ -53,13 +53,13 @@ public static class Reprocessor
             // else prose/noise — drop
         }
 
-        // Merge blade spelling variants, then rebuild displays from the canonical blade.
+        // Merge spelling variants, group CX blades by main blade, then rebuild displays.
         var bladeMap = BladeCanonicalizer.BuildMap(parsed.Select(p => p.Combo.Blade));
         var appearances = parsed.Select(p =>
         {
-            var blade = bladeMap[p.Combo.Blade];
-            var display = new Combo(blade, p.Combo.AssistBlade, p.Combo.Ratchet, p.Combo.Bit).Display;
-            return new NewAppearance(blade, display, p.Placement, p.Date);
+            var (groupBlade, displayBladePart) = CxSystem.Resolve(bladeMap[p.Combo.Blade]);
+            var display = new Combo(displayBladePart, p.Combo.AssistBlade, p.Combo.Ratchet, p.Combo.Bit).Display;
+            return new NewAppearance(groupBlade, display, p.Placement, p.Date);
         }).ToList();
 
         File.WriteAllText(appPath, JsonSerializer.Serialize(appearances, outOpts));
