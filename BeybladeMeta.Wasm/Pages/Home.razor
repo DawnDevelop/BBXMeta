@@ -24,21 +24,22 @@ else if (_all.Count == 0)
 else
 {
     <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-3" Spacing="3">
-        <MudSelect T="string" Value="_selectedWeek" ValueChanged="OnWeekChanged" Label="Week"
+        <MudSelect T="string" Value="_selectedWindow" ValueChanged="OnWindowChanged" Label="Time range"
                    Variant="Variant.Outlined" Dense="true" Style="max-width: 14rem;">
-            <MudSelectItem T="string" Value="@("")">All weeks</MudSelectItem>
-            @foreach (var week in _weeks)
+            @foreach (var w in Windows)
             {
-                <MudSelectItem T="string" Value="@week">@week</MudSelectItem>
-            }
-            @if (_hasUndated)
-            {
-                <MudSelectItem T="string" Value="@("?")">(unknown date)</MudSelectItem>
+                <MudSelectItem T="string" Value="@w.Key">@w.Label</MudSelectItem>
             }
         </MudSelect>
         <MudChip T="string" Color="Color.Primary" Variant="Variant.Outlined">
-            @Blades.Count() blades
+            @Blades.Count() blades · @FilteredCount appearances
         </MudChip>
+        @if (_undatedCount > 0 && _selectedWindow != "all")
+        {
+            <MudChip T="string" Color="Color.Warning" Variant="Variant.Text" Size="Size.Small">
+                @_undatedCount undated appearances excluded
+            </MudChip>
+        }
     </MudStack>
 
     <MudTable Items="Blades" Hover="true" Dense="true" Elevation="2" AllowUnsorted="false"
@@ -107,7 +108,10 @@ else
 }
 
 @code {
-    public sealed record Appearance(string Blade, string Display, int Placement, string? Week);
+    public sealed record Appearance(string Blade, string Display, int Placement, string? Date)
+    {
+        public DateOnly? On => DateOnly.TryParse(Date, out var d) ? d : null;
+    }
 
     public sealed record ComboRow(string Display, int First, int Second, int Third)
     {
@@ -120,19 +124,38 @@ else
         public int Score => 3 * First + 2 * Second + Third;
     }
 
+    // Relative time windows measured back from today; null cutoff = all time.
+    private sealed record Window(string Key, string Label, Func<DateOnly, DateOnly?> Cutoff);
+
+    private static readonly Window[] Windows =
+    [
+        new("all", "All time", _ => null),
+        new("1w", "Last 1 week", t => t.AddDays(-7)),
+        new("2w", "Last 2 weeks", t => t.AddDays(-14)),
+        new("4w", "Last 4 weeks", t => t.AddDays(-28)),
+        new("3m", "Last 3 months", t => t.AddMonths(-3)),
+        new("6m", "Last 6 months", t => t.AddMonths(-6)),
+    ];
+
     private List<Appearance>? _all;
-    private List<string> _weeks = [];
-    private bool _hasUndated;
-    private string _selectedWeek = "";
+    private int _undatedCount;
+    private string _selectedWindow = "4w";
     private BladeRow? _selected;
     private readonly HashSet<string> _expanded = [];
 
-    private IEnumerable<Appearance> Filtered => _selectedWeek switch
+    private IEnumerable<Appearance> Filtered
     {
-        "" => _all!,
-        "?" => _all!.Where(a => a.Week is null),
-        _ => _all!.Where(a => a.Week == _selectedWeek),
-    };
+        get
+        {
+            var window = Windows.First(w => w.Key == _selectedWindow);
+            var cutoff = window.Cutoff(DateOnly.FromDateTime(DateTime.Today));
+            return cutoff is null
+                ? _all!
+                : _all!.Where(a => a.On is { } d && d >= cutoff);
+        }
+    }
+
+    private int FilteredCount => Filtered.Count();
 
     private IEnumerable<BladeRow> Blades => Filtered
         .GroupBy(a => a.Blade)
@@ -165,9 +188,10 @@ else
         try
         {
             _all = await Http.GetFromJsonAsync<List<Appearance>>("data/appearances.json") ?? [];
-            _weeks = _all.Where(a => a.Week is not null).Select(a => a.Week!)
-                .Distinct().OrderByDescending(w => w).ToList();
-            _hasUndated = _all.Any(a => a.Week is null);
+            _undatedCount = _all.Count(a => a.On is null);
+            // Until a re-index populates dates, the 4-week default would be empty — show all instead.
+            if (!_all.Any(a => a.On is not null))
+                _selectedWindow = "all";
         }
         catch (HttpRequestException)
         {
@@ -177,9 +201,9 @@ else
 
     private string? _error;
 
-    private void OnWeekChanged(string week)
+    private void OnWindowChanged(string window)
     {
-        _selectedWeek = week;
+        _selectedWindow = window;
         _expanded.Clear();
     }
 }

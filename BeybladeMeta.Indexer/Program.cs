@@ -51,7 +51,7 @@ static async Task ExportAsync(MetaDbContext db, string outDir)
     var appearances = (await db.Appearances
             .Select(a => new { a.Blade, a.Display, a.Placement, a.Post!.PostedAt })
             .ToListAsync())
-        .Select(a => new { a.Blade, a.Display, a.Placement, Week = ToIsoWeek(a.PostedAt) });
+        .Select(a => new { a.Blade, a.Display, a.Placement, Date = a.PostedAt?.ToString("yyyy-MM-dd") });
     await File.WriteAllTextAsync(Path.Combine(outDir, "appearances.json"),
         JsonSerializer.Serialize(appearances, jsonOptions));
 
@@ -63,6 +63,3 @@ static async Task ExportAsync(MetaDbContext db, string outDir)
 
     Console.WriteLine($"Exported {appearances.Count()} appearances, {unmatched.Count} unmatched lines to {outDir}.");
 }
-
-static string? ToIsoWeek(DateTime? date) =>
-    date is null ? null : $"{ISOWeek.GetYear(date.Value)}-W{ISOWeek.GetWeekOfYear(date.Value):00}";

@@ -10,9 +10,9 @@ namespace BeybladeMeta.Indexer;
 /// </summary>
 public static class Reprocessor
 {
-    private sealed record OldAppearance(string? Blade, string Display, int Placement, string? Week);
+    private sealed record OldAppearance(string? Blade, string Display, int Placement, string? Date);
     private sealed record OldUnmatched(int Page, int Placement, string Line);
-    private sealed record NewAppearance(string Blade, string Display, int Placement, string? Week);
+    private sealed record NewAppearance(string Blade, string Display, int Placement, string? Date);
 
     public static void Run(string dir)
     {
@@ -33,7 +33,7 @@ public static class Reprocessor
         {
             var combo = parser.TryParseCombo(a.Display);
             if (combo is not null)
-                appearances.Add(new NewAppearance(combo.Blade, combo.Display, a.Placement, a.Week));
+                appearances.Add(new NewAppearance(combo.Blade, combo.Display, a.Placement, a.Date));
         }
 
         // Previously-unmatched raw lines: recover the ones the new parser now understands.
