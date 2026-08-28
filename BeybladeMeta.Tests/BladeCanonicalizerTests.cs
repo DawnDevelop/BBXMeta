@@ -22,6 +22,18 @@ public class BladeCanonicalizerTests
     }
 
     [Fact]
+    public void Case_and_boundary_variants_merge_via_letter_key()
+    {
+        // "Sharkscale" (one word) can't token-split, but its letters match "SharkScale".
+        var map = BladeCanonicalizer.BuildMap(
+            ["SharkScale", "SharkScale", "SharkScale", "Sharkscale", "Shark Scale", "ScaleShark"]);
+
+        Assert.Equal("SharkScale", map["Sharkscale"]);
+        Assert.Equal("SharkScale", map["Shark Scale"]);
+        Assert.Equal("SharkScale", map["ScaleShark"]); // word-order still merges too
+    }
+
+    [Fact]
     public void Build_map_picks_the_most_frequent_spelling_as_canonical()
     {
         // 3× WyvernHover, 2× "Hover Wyvern", 1× HoverWyvern → all map to WyvernHover
