@@ -9,7 +9,7 @@ public interface IThreadPageSource
     Task<string> GetPageHtmlAsync(int page, CancellationToken ct = default);
 }
 
-public sealed record CatchUpOptions(int MinBackfillPage = 100, TimeSpan? PageDelay = null, int Concurrency = 1)
+public sealed record CatchUpOptions(int MinBackfillPage = 100, TimeSpan? PageDelay = null, int Concurrency = 1, int? MaxPage = null)
 {
     public TimeSpan Delay => PageDelay ?? TimeSpan.FromSeconds(2);
     public int EffectiveConcurrency => Math.Max(1, Concurrency);
@@ -41,6 +41,8 @@ public sealed class CatchUpIndexer(
         // "?page=999999" probe silently read page-1 content — do not use it.)
         var firstHtml = await source.GetPageHtmlAsync(startPage, ct);
         var lastPage = MyBbPostExtractor.GetLastPageNumber(firstHtml);
+        if (options.MaxPage is { } cap && cap < lastPage)
+            lastPage = cap; // testing cap
         if (startPage > lastPage)
         {
             // The floor/last-indexed page overshot a shorter-than-expected thread.

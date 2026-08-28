@@ -27,9 +27,11 @@ public sealed class ScrapingApiPageSource(HttpClient http, string apiKey, string
         var key = Environment.GetEnvironmentVariable("SCRAPER_API_KEY")
                   ?? throw new InvalidOperationException("SCRAPER_API_KEY is not set.");
         // Defaults to ZenRows (permanent free tier, Cloudflare-solving included).
+        // wait_for=.post_body makes ZenRows hold until the posts render, so it can't
+        // return a truncated head-only page (which happened intermittently).
         // Override SCRAPER_URL_TEMPLATE to switch providers.
         var template = Environment.GetEnvironmentVariable("SCRAPER_URL_TEMPLATE")
-                       ?? "https://api.zenrows.com/v1/?apikey={KEY}&url={URL}&js_render=true&premium_proxy=true";
+                       ?? "https://api.zenrows.com/v1/?apikey={KEY}&url={URL}&js_render=true&premium_proxy=true&wait_for=.post_body";
         var attempts = int.TryParse(Environment.GetEnvironmentVariable("SCRAPER_MAX_ATTEMPTS"), out var a) ? a : 3;
         http.Timeout = TimeSpan.FromSeconds(120); // rendered+solved fetches are slow
         return new ScrapingApiPageSource(http, key, template, attempts);

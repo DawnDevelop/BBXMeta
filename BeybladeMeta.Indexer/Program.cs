@@ -10,6 +10,7 @@ var dbPath = Environment.GetEnvironmentVariable("INDEXER_DB") ?? "data/beyblade-
 var outDir = Environment.GetEnvironmentVariable("INDEXER_OUT") ?? "data";
 var minPage = int.TryParse(Environment.GetEnvironmentVariable("INDEXER_MIN_PAGE"), out var mp) ? mp : 100;
 var concurrency = int.TryParse(Environment.GetEnvironmentVariable("INDEXER_CONCURRENCY"), out var cc) ? cc : 5;
+int? maxPage = int.TryParse(Environment.GetEnvironmentVariable("INDEXER_MAX_PAGE"), out var xp) ? xp : null;
 
 // Offline data fix: re-parse existing exports with the current parser (no scraping).
 if (Environment.GetEnvironmentVariable("REPROCESS") == "1")
@@ -31,7 +32,7 @@ try
 {
     using var http = new HttpClient();
     var source = ScrapingApiPageSource.FromEnvironment(http);
-    await new CatchUpIndexer(db, ingestion, source, new CatchUpOptions(minPage, Concurrency: concurrency), Console.WriteLine).RunAsync();
+    await new CatchUpIndexer(db, ingestion, source, new CatchUpOptions(minPage, Concurrency: concurrency, MaxPage: maxPage), Console.WriteLine).RunAsync();
 }
 catch (Exception ex)
 {
