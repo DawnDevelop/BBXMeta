@@ -88,7 +88,7 @@ public sealed partial class PostParser(PartsVocabulary vocabulary)
             if (bladePart.Length == 0 || bit.Length == 0)
                 return null;
             var (blade, assist) = SplitAssist(bladePart);
-            return new Combo(blade, assist, ratchet.Value, bit);
+            return new Combo(blade, assist, ratchet.Value, vocabulary.CanonicalBit(bit));
         }
 
         // No ratchet: only accept if the line ends with a known bit (unique/CX blades).

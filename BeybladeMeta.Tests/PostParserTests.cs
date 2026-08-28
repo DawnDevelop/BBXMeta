@@ -105,6 +105,20 @@ public class PostParserTests
         Assert.Equal(a.Key, b.Key);
     }
 
+    [Theory]
+    [InlineData("WizardRod 1-60Fb", "WizardRod 1-60FreeBall")]   // Fb == Free Ball
+    [InlineData("WizardRod 1-60H", "WizardRod 1-60Hexa")]        // H == Hexa
+    [InlineData("SharkScale 3-60LR", "SharkScale 3-60Low Rush")] // LR == Low Rush
+    [InlineData("CobaltDragoon 5-60GF", "CobaltDragoon 5-60Gear Flat")]
+    public void Bit_abbreviations_merge_with_full_names(string abbreviated, string full)
+    {
+        var a = _parser.Parse($"1st A\n{abbreviated}").Placements[0].Combos[0];
+        var b = _parser.Parse($"1st B\n{full}").Placements[0].Combos[0];
+
+        Assert.Equal(b.Bit, a.Bit);   // both resolve to the full canonical bit
+        Assert.Equal(b.Key, a.Key);   // and therefore the same leaderboard row
+    }
+
     [Fact]
     public void Post_without_placements_yields_nothing()
     {

@@ -2,25 +2,62 @@ namespace BeybladeMeta.Core.Parsing;
 
 /// <summary>
 /// Beyblade X combos are parsed structurally (anchored on the ratchet code), so
-/// no blade catalog is needed. This vocabulary only supports two narrow jobs:
-/// splitting a CX assist part off the blade name, and recognizing ratchet-less
-/// combos (unique blades like "BulletGriffon Hexa") by their trailing bit.
+/// no blade catalog is needed. This vocabulary supports three narrow jobs:
+/// splitting a CX assist part off the blade name, recognizing ratchet-less combos
+/// (unique blades like "BulletGriffon Hexa") by their trailing bit, and — most
+/// importantly — canonicalizing bit names so abbreviations merge with full names
+/// ("Fb"/"FreeBall"/"Free Ball" → "Free Ball", "H" → "Hexa").
 /// </summary>
 public sealed class PartsVocabulary
 {
-    private readonly Dictionary<string, string> _bits; // normalized -> canonical (spaced) form
-    private readonly HashSet<string> _assists;         // normalized assist-blade names
+    private readonly Dictionary<string, string> _bitCanonical; // normalized form -> canonical full name
+    private readonly HashSet<string> _assists;                 // normalized assist-blade names
     private readonly int _maxBitWords;
 
     public PartsVocabulary(IEnumerable<string> bits, IEnumerable<string> assistBlades)
     {
-        _bits = bits.Distinct().ToDictionary(Normalize, b => b);
+        var bitList = bits.Distinct().ToList();
+        _bitCanonical = BuildBitMap(bitList);
         _assists = assistBlades.Select(Normalize).ToHashSet();
-        _maxBitWords = _bits.Keys.Count == 0 ? 1 : bits.Select(b => b.Split(' ').Length).Max();
+        _maxBitWords = bitList.Count == 0 ? 1 : bitList.Select(b => b.Split(' ').Length).Max();
     }
 
     public static string Normalize(string s) =>
-        s.Replace(" ", "").Replace(" ", "").ToLowerInvariant().Trim();
+        s.Replace(" ", "").Replace(" ", "").ToLowerInvariant().Trim();
+
+    /// <summary>Standard bit code: first letter for one word, initials for several.</summary>
+    private static string Abbreviate(string bit)
+    {
+        var words = bit.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return words.Length == 1 ? words[0][..1] : string.Concat(words.Select(w => w[..1]));
+    }
+
+    private static Dictionary<string, string> BuildBitMap(List<string> bits)
+    {
+        var map = new Dictionary<string, string>();
+        // Full names (and their spaceless forms) always map to themselves.
+        foreach (var bit in bits)
+            map[Normalize(bit)] = bit;
+
+        // Abbreviations map to the full name, but only when unambiguous.
+        var byAbbr = bits.GroupBy(b => Normalize(Abbreviate(b)));
+        foreach (var group in byAbbr)
+        {
+            if (group.Count() != 1)
+                continue; // colliding code (e.g. Wall Ball vs Wide Ball) — leave separate
+            var abbr = group.Key;
+            if (!map.ContainsKey(abbr)) // don't let an abbreviation shadow a real full name
+                map[abbr] = group.Single();
+        }
+        return map;
+    }
+
+    /// <summary>Canonical full-name form of a bit; returns the input trimmed if unknown.</summary>
+    public string CanonicalBit(string raw)
+    {
+        var trimmed = raw.Trim();
+        return _bitCanonical.TryGetValue(Normalize(trimmed), out var canonical) ? canonical : trimmed;
+    }
 
     public bool IsAssist(string token) => _assists.Contains(Normalize(token));
 
@@ -34,7 +71,7 @@ public sealed class PartsVocabulary
         for (var take = Math.Min(_maxBitWords, tokens.Length); take >= 1; take--)
         {
             var candidate = string.Join("", tokens[^take..]);
-            if (_bits.TryGetValue(Normalize(candidate), out var canonical))
+            if (_bitCanonical.TryGetValue(Normalize(candidate), out var canonical))
             {
                 var bladePart = string.Join(' ', tokens[..^take]);
                 if (bladePart.Length > 0)

@@ -55,8 +55,9 @@ public static class Reprocessor
 
         File.WriteAllText(appPath, JsonSerializer.Serialize(appearances, outOpts));
         File.WriteAllText(unmPath, JsonSerializer.Serialize(stillUnmatched, outOpts));
-        Console.WriteLine($"Reprocessed: {appearances.Count} appearances ({recovered} recovered from unmatched), " +
-                          $"{stillUnmatched.Count} still unmatched. Weeks are null until a re-index.");
+        var dated = appearances.Count(a => a.Date is not null);
+        Console.WriteLine($"Reprocessed: {appearances.Count} appearances ({recovered} recovered from unmatched, " +
+                          $"{dated} dated), {stillUnmatched.Count} still unmatched.");
     }
 
     // Keep genuine combo-looking misses in the review list; drop prose entirely.
