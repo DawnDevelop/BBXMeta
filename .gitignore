@@ -8,8 +8,8 @@ publish/
 *.db-shm
 *.db-wal
 data/beyblade-meta.db
-.chrome-profile/
 scratch-test/
+.chrome-profile/
 
 ## IDE
 .vs/

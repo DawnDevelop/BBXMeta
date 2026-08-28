@@ -37,7 +37,7 @@ public sealed class ScrapingApiPageSource(HttpClient http, string apiKey, string
 
     public async Task<string> GetPageHtmlAsync(int page, CancellationToken ct = default)
     {
-        var target = $"{ThreadClient.ThreadUrl}?page={page}";
+        var target = $"{WboThread.Url}?page={page}";
         var endpoint = urlTemplate
             .Replace("{KEY}", Uri.EscapeDataString(apiKey))
             .Replace("{URL}", Uri.EscapeDataString(target))

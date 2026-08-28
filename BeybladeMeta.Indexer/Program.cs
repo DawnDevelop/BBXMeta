@@ -19,29 +19,11 @@ db.Database.EnsureCreated();
 
 var ingestion = new IngestionService(db, new PostParser(PartsVocabulary.CreateDefault()));
 
-// SOURCE selects how live pages are fetched: scraper (default) | wayback | playwright.
-var sourceKind = (Environment.GetEnvironmentVariable("SOURCE") ?? "scraper").ToLowerInvariant();
-
 try
 {
-    switch (sourceKind)
-    {
-        case "wayback":
-            using (var http = new HttpClient())
-                await new CatchUpIndexer(db, ingestion, new WaybackPageSource(http), new CatchUpOptions(minPage), Console.WriteLine)
-                    .RunAsync();
-            break;
-        case "playwright":
-            await using (var source = await PlaywrightPageSource.CreateAsync())
-                await new CatchUpIndexer(db, ingestion, source, new CatchUpOptions(minPage), Console.WriteLine)
-                    .RunAsync();
-            break;
-        default: // scraper
-            using (var http = new HttpClient())
-                await new CatchUpIndexer(db, ingestion, ScrapingApiPageSource.FromEnvironment(http), new CatchUpOptions(minPage), Console.WriteLine)
-                    .RunAsync();
-            break;
-    }
+    using var http = new HttpClient();
+    var source = ScrapingApiPageSource.FromEnvironment(http);
+    await new CatchUpIndexer(db, ingestion, source, new CatchUpOptions(minPage), Console.WriteLine).RunAsync();
 }
 catch (Exception ex)
 {

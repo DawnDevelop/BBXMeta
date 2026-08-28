@@ -3,5 +3,4 @@
   <Project Path="BeybladeMeta.Indexer/BeybladeMeta.Indexer.csproj" />
   <Project Path="BeybladeMeta.Tests/BeybladeMeta.Tests.csproj" />
   <Project Path="BeybladeMeta.Wasm/BeybladeMeta.Wasm.csproj" />
-  <Project Path="BeybladeMeta.Web/BeybladeMeta.Web.csproj" />
 </Solution>
