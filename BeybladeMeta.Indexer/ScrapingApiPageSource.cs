@@ -46,19 +46,17 @@ public sealed class ScrapingApiPageSource(HttpClient http, string apiKey, string
             .Replace("{URL_RAW}", target);
 
         Exception? last = null;
-        string? lastBody = null;
         for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
             try
             {
                 var response = await http.GetAsync(endpoint, ct);
                 var body = await response.Content.ReadAsStringAsync(ct);
-                lastBody = body;
                 if (response.IsSuccessStatusCode && LooksLikeThread(body))
                     return body;
                 last = new HttpRequestException(
-                    $"Scraper returned {(int)response.StatusCode} for page {page} " +
-                    $"(attempt {attempt}/{maxAttempts}); {Describe(body)}");
+                    $"Scraper returned {(int)response.StatusCode} without post content for page {page} " +
+                    $"(attempt {attempt}/{maxAttempts}).");
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -67,30 +65,11 @@ public sealed class ScrapingApiPageSource(HttpClient http, string apiKey, string
             if (attempt < maxAttempts)
                 await Task.Delay(TimeSpan.FromSeconds(5 * attempt), ct);
         }
-
-        // Dump the last body so the exact ZenRows response can be inspected.
-        var debugDir = Environment.GetEnvironmentVariable("SCRAPER_DEBUG_DIR");
-        if (debugDir is not null && lastBody is not null)
-        {
-            Directory.CreateDirectory(debugDir);
-            await File.WriteAllTextAsync(Path.Combine(debugDir, $"page{page}-fail.html"), lastBody, ct);
-        }
         throw last ?? new HttpRequestException($"Failed to fetch page {page}.");
     }
 
-    // Guard against the API returning a Cloudflare interstitial as a 200.
+    // Guard against the API returning a Cloudflare interstitial or truncated page as a 200.
     private static bool LooksLikeThread(string html) =>
         html.Contains("post_body", StringComparison.OrdinalIgnoreCase)
         && !html.Contains("Just a moment", StringComparison.OrdinalIgnoreCase);
-
-    // Short classification of a non-thread body for the error message.
-    private static string Describe(string body)
-    {
-        if (body.Length == 0) return "empty body";
-        if (body.Contains("Just a moment", StringComparison.OrdinalIgnoreCase)) return "Cloudflare challenge page";
-        if (body.Contains("concurrency", StringComparison.OrdinalIgnoreCase)) return "ZenRows concurrency-limit error";
-        if (body.TrimStart().StartsWith('{')) return $"JSON error: {body[..Math.Min(200, body.Length)]}";
-        if (!body.Contains("post_body", StringComparison.OrdinalIgnoreCase)) return "HTML without post bodies";
-        return $"unrecognized ({body.Length} bytes)";
-    }
 }
