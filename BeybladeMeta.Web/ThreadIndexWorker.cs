@@ -6,8 +6,8 @@ namespace BeybladeMeta.Web;
 public sealed class ThreadIndexOptions
 {
     public bool Enabled { get; set; } = true;
-    /// <summary>How far back the initial backfill reaches.</summary>
-    public int BackfillMonths { get; set; } = 6;
+    /// <summary>First page the initial backfill starts from (~Feb 2 = page 100).</summary>
+    public int MinBackfillPage { get; set; } = 100;
     /// <summary>Delay between scheduled catch-up runs.</summary>
     public TimeSpan Interval { get; set; } = TimeSpan.FromHours(6);
     /// <summary>Politeness delay between page fetches.</summary>
@@ -34,7 +34,7 @@ public sealed class ThreadIndexWorker(
                     scope.ServiceProvider.GetRequiredService<MetaDbContext>(),
                     scope.ServiceProvider.GetRequiredService<IngestionService>(),
                     scope.ServiceProvider.GetRequiredService<ThreadClient>(),
-                    new CatchUpOptions(options.BackfillMonths, options.PageDelay),
+                    new CatchUpOptions(options.MinBackfillPage, options.PageDelay),
                     message => logger.LogInformation("{Message}", message));
                 await indexer.RunAsync(stoppingToken);
             }

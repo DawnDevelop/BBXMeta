@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 var dbPath = Environment.GetEnvironmentVariable("INDEXER_DB") ?? "data/beyblade-meta.db";
 var outDir = Environment.GetEnvironmentVariable("INDEXER_OUT") ?? "data";
-var backfillMonths = int.TryParse(Environment.GetEnvironmentVariable("INDEXER_BACKFILL_MONTHS"), out var m) ? m : 6;
+var minPage = int.TryParse(Environment.GetEnvironmentVariable("INDEXER_MIN_PAGE"), out var mp) ? mp : 100;
 
 Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(dbPath))!);
 Directory.CreateDirectory(outDir);
@@ -28,17 +28,17 @@ try
     {
         case "wayback":
             using (var http = new HttpClient())
-                await new CatchUpIndexer(db, ingestion, new WaybackPageSource(http), new CatchUpOptions(backfillMonths), Console.WriteLine)
+                await new CatchUpIndexer(db, ingestion, new WaybackPageSource(http), new CatchUpOptions(minPage), Console.WriteLine)
                     .RunAsync();
             break;
         case "playwright":
             await using (var source = await PlaywrightPageSource.CreateAsync())
-                await new CatchUpIndexer(db, ingestion, source, new CatchUpOptions(backfillMonths), Console.WriteLine)
+                await new CatchUpIndexer(db, ingestion, source, new CatchUpOptions(minPage), Console.WriteLine)
                     .RunAsync();
             break;
         default: // scraper
             using (var http = new HttpClient())
-                await new CatchUpIndexer(db, ingestion, ScrapingApiPageSource.FromEnvironment(http), new CatchUpOptions(backfillMonths), Console.WriteLine)
+                await new CatchUpIndexer(db, ingestion, ScrapingApiPageSource.FromEnvironment(http), new CatchUpOptions(minPage), Console.WriteLine)
                     .RunAsync();
             break;
     }

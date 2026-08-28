@@ -11,7 +11,7 @@ public class PostParserTests
     public void Parses_quoted_at_username_with_three_bey_deck()
     {
         const string post = """
-            1st @"Joaquin7344"
+            1st @"Blader001"
             MeteorDragoon 7-60Level (First Stage & Final Stage)
             SharkScale 3-60Rush (First Stage & Final Stage)
             WizardRod 1-60Hexa (First Stage & Final Stage)
@@ -21,7 +21,7 @@ public class PostParserTests
 
         var placement = Assert.Single(result.Placements);
         Assert.Equal(1, placement.Placement);
-        Assert.Equal("Joaquin7344", placement.Player);
+        Assert.Equal("Blader001", placement.Player);
         Assert.Equal(
             ["MeteorDragoon 7-60Level", "SharkScale 3-60Rush", "WizardRod 1-60Hexa"],
             placement.Combos.Select(c => c.Display));
@@ -32,7 +32,7 @@ public class PostParserTests
     public void Parses_dashed_username_with_deck_header_assist_blade_and_ratchetless_combo()
     {
         const string post = """
-            1st - Sikuya
+            1st - Blader002
 
             Final Stage - Registered Deck List:
             CobaltDragoon 9-60Elevate (First Stage & Final Stage)
@@ -43,7 +43,7 @@ public class PostParserTests
         var result = _parser.Parse(post);
 
         var placement = Assert.Single(result.Placements);
-        Assert.Equal("Sikuya", placement.Player);
+        Assert.Equal("Blader002", placement.Player);
         Assert.Equal(
             ["CobaltDragoon 9-60Elevate", "Valor Bison Glide", "EmperorWhip OuterWheel 5-60Unite"],
             placement.Combos.Select(c => c.Display));
@@ -54,7 +54,7 @@ public class PostParserTests
     public void Parses_bare_username_with_four_bey_deck_and_multiword_bit()
     {
         const string post = """
-            1st Rjustice0630
+            1st Blader003
             AeroPegasus 1-50Rush (First Stage & Final Stage)
             CobaltDragoon 5-50Elevate (First Stage & Final Stage)
             SharkScale 9-60Free Ball (First Stage & Final Stage)
@@ -64,7 +64,7 @@ public class PostParserTests
         var result = _parser.Parse(post);
 
         var placement = Assert.Single(result.Placements);
-        Assert.Equal("Rjustice0630", placement.Player);
+        Assert.Equal("Blader003", placement.Player);
         Assert.Equal(4, placement.Combos.Count);
         Assert.Equal("SharkScale 9-60FreeBall", placement.Combos[2].Display);
         Assert.Empty(result.Unmatched);
