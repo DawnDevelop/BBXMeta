@@ -1,0 +1,88 @@
+name: Index and deploy
+
+on:
+  schedule:
+    - cron: "17 3 */2 * *" # every 48 hours (03:17 UTC every other day)
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: index-and-deploy
+  cancel-in-progress: false
+
+jobs:
+  index:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      # Fetches only new pages since last run via ZenRows (solves Cloudflare from a
+      # residential proxy). On failure the DB/JSON are untouched, so the deploy job
+      # still publishes the last good data.
+      - name: Run indexer
+        run: dotnet run --project BeybladeMeta.Indexer -c Release
+        env:
+          SOURCE: scraper
+          SCRAPER_API_KEY: ${{ secrets.SCRAPER_API_KEY }}
+          INDEXER_DB: data/beyblade-meta.db
+          INDEXER_OUT: data
+          INDEXER_BACKFILL_MONTHS: 6
+
+      - name: Commit updated data
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data
+          if ! git diff --cached --quiet; then
+            git commit -m "Update index data [skip ci]"
+            git push
+          fi
+
+  deploy:
+    needs: index
+    if: always()
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main # pick up the data commit the index job just pushed
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Publish WASM app
+        run: dotnet publish BeybladeMeta.Wasm -c Release -o publish
+
+      - name: Prepare Pages payload
+        run: |
+          # Pages serves from /<repo>/, not /
+          sed -i "s|<base href=\"/\" />|<base href=\"/${{ github.event.repository.name }}/\" />|" publish/wwwroot/index.html
+          mkdir -p publish/wwwroot/data
+          cp data/*.json publish/wwwroot/data/ 2>/dev/null || echo "No data files yet"
+          # SPA deep links fall back to the app instead of a GitHub 404
+          cp publish/wwwroot/index.html publish/wwwroot/404.html
+          touch publish/wwwroot/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: publish/wwwroot
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

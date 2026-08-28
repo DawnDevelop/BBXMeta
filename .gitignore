@@ -1,0 +1,21 @@
+## .NET build output
+bin/
+obj/
+publish/
+
+## Local database and indexer working files
+*.db
+*.db-shm
+*.db-wal
+data/beyblade-meta.db
+.chrome-profile/
+scratch-test/
+
+## IDE
+.vs/
+.idea/
+*.user
+
+## OS
+.DS_Store
+Thumbs.db

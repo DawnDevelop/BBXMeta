@@ -1,0 +1,62 @@
+@page "/unmatched"
+@inject HttpClient Http
+
+<PageTitle>Unmatched Lines</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">Unmatched Combo Lines</MudText>
+<MudText Typo="Typo.body2" Class="mud-text-secondary mb-4">
+    Lines inside a 1st/2nd/3rd block that didn't match the parts vocabulary — usually a new
+    part missing from the vocabulary, or a typo in the post.
+</MudText>
+
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Info">@_error</MudAlert>
+}
+else if (_entries is null)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else if (_entries.Count == 0)
+{
+    <MudAlert Severity="Severity.Success">Nothing unmatched — all parsed lines resolved against the vocabulary.</MudAlert>
+}
+else
+{
+    <MudTable Items="_entries" Hover="true" Dense="true" Striped="true" Elevation="2">
+        <HeaderContent>
+            <MudTh>Page</MudTh>
+            <MudTh>Post author</MudTh>
+            <MudTh>Placement</MudTh>
+            <MudTh>Line</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Page">@context.Page</MudTd>
+            <MudTd DataLabel="Author">@context.Author</MudTd>
+            <MudTd DataLabel="Placement">@context.Placement</MudTd>
+            <MudTd DataLabel="Line"><code>@context.Line</code></MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="new[] { 25, 50, 100 }" />
+        </PagerContent>
+    </MudTable>
+}
+
+@code {
+    public sealed record Entry(int Page, string Author, int Placement, string Line);
+
+    private List<Entry>? _entries;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _entries = await Http.GetFromJsonAsync<List<Entry>>("data/unmatched.json") ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            _error = "No data published yet (data/unmatched.json missing).";
+        }
+    }
+}

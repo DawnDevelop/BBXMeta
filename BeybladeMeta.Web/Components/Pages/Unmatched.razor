@@ -1,0 +1,54 @@
+@page "/unmatched"
+@using BeybladeMeta.Core.Data
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<MetaDbContext> DbFactory
+@rendermode InteractiveServer
+
+<PageTitle>Unmatched Lines</PageTitle>
+
+<h1>Unmatched Combo Lines</h1>
+<p class="hint">
+    Lines inside a 1st/2nd/3rd block that didn't match the parts vocabulary — usually a new
+    part missing from the vocabulary, or a typo in the post. Add the part to
+    <code>PartsVocabulary</code> and re-ingest to resolve.
+</p>
+
+@if (_entries is null)
+{
+    <p>Loading…</p>
+}
+else if (_entries.Count == 0)
+{
+    <p>Nothing unmatched — all parsed lines resolved against the vocabulary.</p>
+}
+else
+{
+    <table class="leaderboard">
+        <thead>
+            <tr><th>Page</th><th>Post author</th><th>Placement</th><th>Line</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var entry in _entries)
+            {
+                <tr>
+                    <td>@entry.Post!.Page</td>
+                    <td>@entry.Post!.Author</td>
+                    <td>@entry.Placement</td>
+                    <td class="combo">@entry.Line</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<UnmatchedEntry>? _entries;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        _entries = await db.Unmatched.Include(u => u.Post)
+            .OrderBy(u => u.Post!.Page)
+            .ToListAsync();
+    }
+}

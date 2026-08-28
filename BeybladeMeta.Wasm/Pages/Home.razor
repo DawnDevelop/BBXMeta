@@ -1,0 +1,185 @@
+@page "/"
+@inject HttpClient Http
+
+<PageTitle>Beyblade X Meta Leaderboard</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">Beyblade Meta Leaderboard</MudText>
+<MudText Typo="Typo.body2" Class="mud-text-secondary mb-4">
+    Ranked by blade. Score = 3 × #1 + 2 × #2 + 1 × #3 placements. Click a blade to see the
+    exact combos run on it and which performed best.
+</MudText>
+
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Info">@_error</MudAlert>
+}
+else if (_all is null)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else if (_all.Count == 0)
+{
+    <MudAlert Severity="Severity.Info">No data indexed yet.</MudAlert>
+}
+else
+{
+    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-3" Spacing="3">
+        <MudSelect T="string" Value="_selectedWeek" ValueChanged="OnWeekChanged" Label="Week"
+                   Variant="Variant.Outlined" Dense="true" Style="max-width: 14rem;">
+            <MudSelectItem T="string" Value="@("")">All weeks</MudSelectItem>
+            @foreach (var week in _weeks)
+            {
+                <MudSelectItem T="string" Value="@week">@week</MudSelectItem>
+            }
+            @if (_hasUndated)
+            {
+                <MudSelectItem T="string" Value="@("?")">(unknown date)</MudSelectItem>
+            }
+        </MudSelect>
+        <MudChip T="string" Color="Color.Primary" Variant="Variant.Outlined">
+            @Blades.Count() blades
+        </MudChip>
+    </MudStack>
+
+    <MudTable Items="Blades" Hover="true" Dense="true" Elevation="2" AllowUnsorted="false"
+              T="BladeRow" @bind-SelectedItem="_selected">
+        <HeaderContent>
+            <MudTh />
+            <MudTh><MudTableSortLabel SortBy="@((BladeRow b) => b.Blade)" T="BladeRow">Blade</MudTableSortLabel></MudTh>
+            <MudTh><MudTableSortLabel SortBy="@((BladeRow b) => b.ComboCount)" T="BladeRow">Combos</MudTableSortLabel></MudTh>
+            <MudTh><MudTableSortLabel SortBy="@((BladeRow b) => b.First)" T="BladeRow">#1</MudTableSortLabel></MudTh>
+            <MudTh><MudTableSortLabel SortBy="@((BladeRow b) => b.Second)" T="BladeRow">#2</MudTableSortLabel></MudTh>
+            <MudTh><MudTableSortLabel SortBy="@((BladeRow b) => b.Third)" T="BladeRow">#3</MudTableSortLabel></MudTh>
+            <MudTh><MudTableSortLabel SortBy="@((BladeRow b) => b.Score)" T="BladeRow" InitialDirection="SortDirection.Descending">Score</MudTableSortLabel></MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>
+                <MudIconButton Size="Size.Small" OnClick="@(() => Toggle(context.Blade))"
+                               Icon="@(IsExpanded(context.Blade) ? Icons.Material.Filled.KeyboardArrowUp : Icons.Material.Filled.KeyboardArrowDown)" />
+            </MudTd>
+            <MudTd DataLabel="Blade"><strong>@context.Blade</strong></MudTd>
+            <MudTd DataLabel="Combos">@context.ComboCount</MudTd>
+            <MudTd DataLabel="#1">@context.First</MudTd>
+            <MudTd DataLabel="#2">@context.Second</MudTd>
+            <MudTd DataLabel="#3">@context.Third</MudTd>
+            <MudTd DataLabel="Score"><strong>@context.Score</strong></MudTd>
+        </RowTemplate>
+        <ChildRowContent>
+            @if (IsExpanded(context.Blade))
+            {
+                <MudTr>
+                    <td colspan="7" class="pa-4" style="background: var(--mud-palette-background-grey);">
+                        <MudText Typo="Typo.subtitle2" Class="mb-2">Combos run on @context.Blade — best first</MudText>
+                        <MudSimpleTable Dense="true" Style="background: transparent;">
+                            <thead>
+                                <tr>
+                                    <th>Combo</th><th>#1</th><th>#2</th><th>#3</th><th>Times run</th><th>Score</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var (combo, i) in CombosFor(context.Blade).Select((c, i) => (c, i)))
+                                {
+                                    <tr>
+                                        <td>
+                                            <code>@combo.Display</code>
+                                            @if (i == 0 && combo.Score > 0)
+                                            {
+                                                <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Text" Class="ml-2">best</MudChip>
+                                            }
+                                        </td>
+                                        <td>@combo.First</td>
+                                        <td>@combo.Second</td>
+                                        <td>@combo.Third</td>
+                                        <td>@combo.Total</td>
+                                        <td><strong>@combo.Score</strong></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </MudSimpleTable>
+                    </td>
+                </MudTr>
+            }
+        </ChildRowContent>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="new[] { 25, 50, 100 }" />
+        </PagerContent>
+    </MudTable>
+}
+
+@code {
+    public sealed record Appearance(string Blade, string Display, int Placement, string? Week);
+
+    public sealed record ComboRow(string Display, int First, int Second, int Third)
+    {
+        public int Total => First + Second + Third;
+        public int Score => 3 * First + 2 * Second + Third;
+    }
+
+    public sealed record BladeRow(string Blade, int ComboCount, int First, int Second, int Third)
+    {
+        public int Score => 3 * First + 2 * Second + Third;
+    }
+
+    private List<Appearance>? _all;
+    private List<string> _weeks = [];
+    private bool _hasUndated;
+    private string _selectedWeek = "";
+    private BladeRow? _selected;
+    private readonly HashSet<string> _expanded = [];
+
+    private IEnumerable<Appearance> Filtered => _selectedWeek switch
+    {
+        "" => _all!,
+        "?" => _all!.Where(a => a.Week is null),
+        _ => _all!.Where(a => a.Week == _selectedWeek),
+    };
+
+    private IEnumerable<BladeRow> Blades => Filtered
+        .GroupBy(a => a.Blade)
+        .Select(g => new BladeRow(
+            g.Key,
+            g.Select(a => a.Display).Distinct().Count(),
+            g.Count(a => a.Placement == 1),
+            g.Count(a => a.Placement == 2),
+            g.Count(a => a.Placement == 3)))
+        .OrderByDescending(b => b.Score);
+
+    private IEnumerable<ComboRow> CombosFor(string blade) => Filtered
+        .Where(a => a.Blade == blade)
+        .GroupBy(a => a.Display)
+        .Select(g => new ComboRow(
+            g.Key,
+            g.Count(a => a.Placement == 1),
+            g.Count(a => a.Placement == 2),
+            g.Count(a => a.Placement == 3)))
+        .OrderByDescending(c => c.Score).ThenByDescending(c => c.Total);
+
+    private bool IsExpanded(string blade) => _expanded.Contains(blade);
+    private void Toggle(string blade)
+    {
+        if (!_expanded.Remove(blade)) _expanded.Add(blade);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _all = await Http.GetFromJsonAsync<List<Appearance>>("data/appearances.json") ?? [];
+            _weeks = _all.Where(a => a.Week is not null).Select(a => a.Week!)
+                .Distinct().OrderByDescending(w => w).ToList();
+            _hasUndated = _all.Any(a => a.Week is null);
+        }
+        catch (HttpRequestException)
+        {
+            _error = "No data published yet (data/appearances.json missing).";
+        }
+    }
+
+    private string? _error;
+
+    private void OnWeekChanged(string week)
+    {
+        _selectedWeek = week;
+        _expanded.Clear();
+    }
+}
