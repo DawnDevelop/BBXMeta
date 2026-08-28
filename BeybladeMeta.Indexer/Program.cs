@@ -35,9 +35,18 @@ try
 }
 catch (Exception ex)
 {
-    // Export whatever the database already holds so a blocked fetch never wipes the site.
-    Console.Error.WriteLine($"Indexing failed: {ex.Message} — exporting existing data only.");
-    await ExportAsync(db, outDir);
+    Console.Error.WriteLine($"Indexing failed: {ex.Message}");
+    // Only re-export if this run actually ingested something; never overwrite good
+    // exports with an empty DB when the very first fetch fails.
+    if (await db.Appearances.AnyAsync())
+    {
+        Console.Error.WriteLine("Exporting the partial data gathered before the failure.");
+        await ExportAsync(db, outDir);
+    }
+    else
+    {
+        Console.Error.WriteLine("No data ingested — leaving existing exports untouched.");
+    }
     return 1;
 }
 
