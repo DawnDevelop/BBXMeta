@@ -5,8 +5,12 @@
 
 <MudText Typo="Typo.h4" GutterBottom="true">Beyblade X Meta Leaderboard</MudText>
 <MudText Typo="Typo.body2" Class="mud-text-secondary mb-4">
-    Score = 3 × #1 + 2 × #2 + 1 × #3 placements. The ▲▼ column shows movement versus the
-    previous period of the same length.
+    Score = 3 × #1 + 2 × #2 + 1 × #3 placements. Movement (▲▼) compares the selected period to
+    the period of the same length before it.
+    @if (_anchor is { } a)
+    {
+        <text> · Data through <strong>@a.ToString("MMM d, yyyy")</strong>.</text>
+    }
 </MudText>
 
 @if (_error is not null)
@@ -148,6 +152,7 @@ else
 
     private List<Appearance> _current = [];
     private List<Appearance>? _prior;
+    private DateOnly? _anchor; // latest event date in the data — the reference for all windows
 
     private string ColumnName => _view switch { "combos" => "Combo", "ratchets" => "Ratchet", "bits" => "Bit", _ => "Blade" };
 
@@ -161,7 +166,9 @@ else
 
     private void RecomputeWindow()
     {
-        var today = DateOnly.FromDateTime(DateTime.Today);
+        // Anchor windows to the newest event in the data (the last import), not the
+        // calendar today, so "last N weeks" stays populated as the data ages.
+        var today = _anchor ?? DateOnly.FromDateTime(DateTime.Today);
         var cutoff = Windows.First(w => w.Key == _selectedWindow).Cutoff(today);
         if (cutoff is null)
         {
@@ -234,8 +241,12 @@ else
         try
         {
             _all = await Http.GetFromJsonAsync<List<Appearance>>("data/appearances.json") ?? [];
-            if (!_all.Any(a => a.On is not null))
+            _anchor = _all.Where(a => a.On is not null).Select(a => a.On!.Value).DefaultIfEmpty().Max();
+            if (_anchor == default)
+            {
+                _anchor = null;
                 _selectedWindow = "all";
+            }
             RecomputeWindow();
         }
         catch (HttpRequestException)
