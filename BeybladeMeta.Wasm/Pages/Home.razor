@@ -200,11 +200,15 @@ else
         }
     }
 
+    // Deterministic order (score, then total, then name) so ties rank the same in every
+    // window — otherwise tied entries would show spurious movement between periods.
+    private static IOrderedEnumerable<RankRow> Ordered(IEnumerable<RankRow> rows) =>
+        rows.OrderByDescending(r => r.Score).ThenByDescending(r => r.Total).ThenBy(r => r.Name, StringComparer.Ordinal);
+
     private static List<RankRow> Rank(List<Appearance> current, List<Appearance>? prior, Func<Appearance, string?> key)
     {
         var priorRanks = prior is null ? null : RankIndex(prior, key);
-        return Group(current, key)
-            .OrderByDescending(r => r.Score)
+        return Ordered(Group(current, key))
             .Select((r, i) =>
             {
                 var rank = i + 1;
@@ -216,8 +220,7 @@ else
     }
 
     private static Dictionary<string, int> RankIndex(List<Appearance> data, Func<Appearance, string?> key) =>
-        Group(data, key)
-            .OrderByDescending(r => r.Score)
+        Ordered(Group(data, key))
             .Select((r, i) => (r.Name, Rank: i + 1))
             .ToDictionary(x => x.Name, x => x.Rank);
 
