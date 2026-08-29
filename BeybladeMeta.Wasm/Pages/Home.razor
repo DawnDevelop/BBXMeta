@@ -48,50 +48,50 @@ else
         <MudChip T="string" Color="Color.Primary" Variant="Variant.Outlined">@Rows.Count() @_view</MudChip>
     </MudStack>
 
-    <MudTable Items="Rows" Hover="true" Dense="true" Elevation="2" T="RankRow">
+    <MudTable Items="Rows" Hover="true" Dense="true" Elevation="2" T="RankRow" Style="max-width: 940px; margin-inline: auto;">
         <HeaderContent>
-            @if (_view == "blades")
+            @if (HasDrilldown)
             {
-                <MudTh />
+                <MudTh Style="width: 2.5rem;" />
             }
-            <MudTh Style="width: 3rem;">#</MudTh>
-            <MudTh Style="width: 4rem;">+/−</MudTh>
+            <MudTh Style="width: 3rem; text-align: right;">#</MudTh>
+            <MudTh Style="width: 4rem; text-align: center;">+/−</MudTh>
             <MudTh>@ColumnName</MudTh>
-            <MudTh>#1</MudTh>
-            <MudTh>#2</MudTh>
-            <MudTh>#3</MudTh>
-            <MudTh>Total</MudTh>
-            <MudTh>Score</MudTh>
+            <MudTh Style="width: 3.5rem; text-align: right;">#1</MudTh>
+            <MudTh Style="width: 3.5rem; text-align: right;">#2</MudTh>
+            <MudTh Style="width: 3.5rem; text-align: right;">#3</MudTh>
+            <MudTh Style="width: 4rem; text-align: right;">Total</MudTh>
+            <MudTh Style="width: 4.5rem; text-align: right;">Score</MudTh>
         </HeaderContent>
         <RowTemplate>
-            @if (_view == "blades")
+            @if (HasDrilldown)
             {
-                <MudTd>
+                <MudTd Style="padding-right: 0;">
                     <MudIconButton Size="Size.Small" OnClick="@(() => Toggle(context.Name))"
                                    Icon="@(IsExpanded(context.Name) ? Icons.Material.Filled.KeyboardArrowUp : Icons.Material.Filled.KeyboardArrowDown)" />
                 </MudTd>
             }
-            <MudTd DataLabel="#" Class="mud-text-secondary">@context.Rank</MudTd>
-            <MudTd DataLabel="+/−">@Movement(context)</MudTd>
+            <MudTd DataLabel="#" Class="mud-text-secondary" Style="text-align: right;">@context.Rank</MudTd>
+            <MudTd DataLabel="+/−" Style="text-align: center;">@Movement(context)</MudTd>
             <MudTd DataLabel="@ColumnName"><strong>@context.Name</strong></MudTd>
-            <MudTd DataLabel="#1">@context.First</MudTd>
-            <MudTd DataLabel="#2">@context.Second</MudTd>
-            <MudTd DataLabel="#3">@context.Third</MudTd>
-            <MudTd DataLabel="Total">@context.Total</MudTd>
-            <MudTd DataLabel="Score"><strong>@context.Score</strong></MudTd>
+            <MudTd DataLabel="#1" Style="text-align: right;">@context.First</MudTd>
+            <MudTd DataLabel="#2" Style="text-align: right;">@context.Second</MudTd>
+            <MudTd DataLabel="#3" Style="text-align: right;">@context.Third</MudTd>
+            <MudTd DataLabel="Total" Style="text-align: right;">@context.Total</MudTd>
+            <MudTd DataLabel="Score" Style="text-align: right;"><strong>@context.Score</strong></MudTd>
         </RowTemplate>
         <ChildRowContent>
-            @if (_view == "blades" && IsExpanded(context.Name))
+            @if (HasDrilldown && IsExpanded(context.Name))
             {
                 <MudTr>
                     <td colspan="9" class="pa-4" style="background: var(--mud-palette-background-grey);">
-                        <MudText Typo="Typo.subtitle2" Class="mb-2">Combos run on @context.Name — best first</MudText>
+                        <MudText Typo="Typo.subtitle2" Class="mb-2">Top combos using @context.Name</MudText>
                         <MudSimpleTable Dense="true" Style="background: transparent;">
                             <thead>
                                 <tr><th>Combo</th><th>#1</th><th>#2</th><th>#3</th><th>Times run</th><th>Score</th></tr>
                             </thead>
                             <tbody>
-                                @foreach (var (combo, i) in CombosFor(context.Name).Select((c, i) => (c, i)))
+                                @foreach (var (combo, i) in CombosForKey(context.Name).Select((c, i) => (c, i)))
                                 {
                                     <tr>
                                         <td>
@@ -226,9 +226,15 @@ else
                 g.Count(a => a.Placement == 2),
                 g.Count(a => a.Placement == 3)));
 
-    private IEnumerable<RankRow> CombosFor(string blade) =>
-        Rank(_current.Where(a => a.Blade == blade).ToList(), null, a => a.Display)
+    // Blades, ratchets and bits drill down into their combos; combos are already the leaf.
+    private bool HasDrilldown => _view != "combos";
+
+    private IEnumerable<RankRow> CombosForKey(string name)
+    {
+        var key = KeySelector;
+        return Rank(_current.Where(a => key(a) == name).ToList(), null, a => a.Display)
             .OrderByDescending(c => c.Score).ThenByDescending(c => c.Total);
+    }
 
     private bool IsExpanded(string name) => _expanded.Contains(name);
     private void Toggle(string name) { if (!_expanded.Remove(name)) _expanded.Add(name); }
@@ -257,10 +263,10 @@ else
 
     private string? _error;
 
-    private RenderFragment Movement(RankRow r) =>@<span>
+    private RenderFragment Movement(RankRow r) =>@<span style="display:inline-flex; align-items:center; justify-content:center; gap:2px;">
         @if (r.IsNew)
         {
-            <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Text">new</MudChip>
+            <span style="color:var(--mud-palette-info); font-size:0.75rem;">new</span>
         }
         else if (r.Delta is { } d && d != 0)
         {
