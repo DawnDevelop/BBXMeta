@@ -58,13 +58,13 @@ else
                 <MudTh Style="width: 2.5rem;" />
             }
             <MudTh Style="width: 3rem; text-align: right;">#</MudTh>
-            <MudTh Style="width: 4rem; text-align: center;">+/−</MudTh>
             <MudTh>@ColumnName</MudTh>
             <MudTh Style="width: 3.5rem; text-align: right;">#1</MudTh>
             <MudTh Style="width: 3.5rem; text-align: right;">#2</MudTh>
             <MudTh Style="width: 3.5rem; text-align: right;">#3</MudTh>
             <MudTh Style="width: 4rem; text-align: right;">Total</MudTh>
             <MudTh Style="width: 4.5rem; text-align: right;">Score</MudTh>
+            <MudTh Style="width: 4rem; text-align: center;">+/−</MudTh>
         </HeaderContent>
         <RowTemplate>
             @if (HasDrilldown)
@@ -75,13 +75,13 @@ else
                 </MudTd>
             }
             <MudTd DataLabel="#" Class="mud-text-secondary" Style="text-align: right;">@context.Rank</MudTd>
-            <MudTd DataLabel="+/−" Style="text-align: center;">@Movement(context)</MudTd>
             <MudTd DataLabel="@ColumnName"><strong>@context.Name</strong></MudTd>
             <MudTd DataLabel="#1" Style="text-align: right;">@context.First</MudTd>
             <MudTd DataLabel="#2" Style="text-align: right;">@context.Second</MudTd>
             <MudTd DataLabel="#3" Style="text-align: right;">@context.Third</MudTd>
             <MudTd DataLabel="Total" Style="text-align: right;">@context.Total</MudTd>
             <MudTd DataLabel="Score" Style="text-align: right;"><strong>@context.Score</strong></MudTd>
+            <MudTd DataLabel="+/−" Style="text-align: center;">@Movement(context)</MudTd>
         </RowTemplate>
         <ChildRowContent>
             @if (HasDrilldown && IsExpanded(context.Name))
