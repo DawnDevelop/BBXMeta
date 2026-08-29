@@ -33,6 +33,7 @@ public static partial class BladeCanonicalizer
         ["ptera talon"] = "PteraSwing",     // Talon Ptera = Ptera Swing
         ["garuda scarlet"] = "CrimsonGaruda", // Scarlet Garuda = Crimson Garuda
         ["obsidian shell"] = "BlackShell",  // Obsidian Shell = Black Shell
+        ["aether ring"] = "HeavensRing",    // Ring Aether = Heavens Ring
     };
 
     /// <summary>Word-order/spacing-invariant key: words lowercased and alphabetised.</summary>
