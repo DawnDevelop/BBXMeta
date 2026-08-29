@@ -9,7 +9,7 @@ public interface IThreadPageSource
     Task<string> GetPageHtmlAsync(int page, CancellationToken ct = default);
 }
 
-public sealed record CatchUpOptions(int MinBackfillPage = 100, TimeSpan? PageDelay = null, int Concurrency = 1)
+public sealed record CatchUpOptions(int MinBackfillPage = 100, TimeSpan? PageDelay = null, int Concurrency = 1, int OverlapPages = 2)
 {
     public TimeSpan Delay => PageDelay ?? TimeSpan.FromSeconds(2);
     public int EffectiveConcurrency => Math.Max(1, Concurrency);
@@ -31,9 +31,11 @@ public sealed class CatchUpIndexer(
     public async Task RunAsync(CancellationToken ct = default)
     {
         var lastIndexed = await db.Posts.MaxAsync(p => (int?)p.Page, ct);
-        var startPage = lastIndexed ?? options.MinBackfillPage;
-        if (startPage < options.MinBackfillPage)
-            startPage = options.MinBackfillPage;
+        // Resume a couple of pages before the last indexed one so posts appended near a
+        // page boundary are always re-read (ingestion stays idempotent per forum post).
+        var startPage = lastIndexed is null
+            ? options.MinBackfillPage
+            : Math.Max(options.MinBackfillPage, lastIndexed.Value - options.OverlapPages);
 
         // Fetch the start page to learn the last page from its pagination bar.
         // (An out-of-range page clamps to page 1 here, so don't probe with a huge number.)

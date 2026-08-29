@@ -53,13 +53,14 @@ public static class Reprocessor
             // else prose/noise — drop
         }
 
-        // Merge spelling variants, group CX blades by main blade, then rebuild displays.
+        // Canonicalize bit, blade spelling and CX grouping — same path as the exporter.
+        var vocab = PartsVocabulary.CreateDefault();
         var bladeMap = BladeCanonicalizer.BuildMap(parsed.Select(p => p.Combo.Blade));
         var appearances = parsed.Select(p =>
         {
-            var (groupBlade, displayBladePart) = CxSystem.Resolve(bladeMap[p.Combo.Blade]);
-            var display = new Combo(displayBladePart, p.Combo.AssistBlade, p.Combo.Ratchet, p.Combo.Bit).Display;
-            return new NewAppearance(groupBlade, display, p.Placement, p.Date);
+            var (blade, display) = CanonicalCombo.Resolve(
+                p.Combo.Blade, p.Combo.AssistBlade, p.Combo.Ratchet, p.Combo.Bit, bladeMap, vocab);
+            return new NewAppearance(blade, display, p.Placement, p.Date);
         }).ToList();
 
         File.WriteAllText(appPath, JsonSerializer.Serialize(appearances, outOpts));
