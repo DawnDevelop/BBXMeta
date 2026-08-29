@@ -62,13 +62,19 @@ static async Task ExportAsync(MetaDbContext db, string outDir)
         .Select(a => new { a.Blade, a.AssistBlade, a.Ratchet, a.Bit, a.Placement, a.Post!.PostedAt })
         .ToListAsync();
 
-    // Canonicalize bit, blade spelling and CX grouping — same path as the reprocessor.
+    // Split stuck assist codes off the blade, then canonicalize bit/blade/CX — same path
+    // as the reprocessor. Assist-splitting runs before the merge map so blades are clean.
     var vocab = PartsVocabulary.CreateDefault();
-    var bladeMap = BladeCanonicalizer.BuildMap(rows.Select(r => r.Blade));
-    var appearances = rows.Select(r =>
+    var prepared = rows.Select(r =>
     {
-        var (blade, display) = CanonicalCombo.Resolve(r.Blade, r.AssistBlade, r.Ratchet, r.Bit, bladeMap, vocab);
-        return new { Blade = blade, Display = display, r.Placement, Date = r.PostedAt?.ToString("yyyy-MM-dd") };
+        var (blade, assist) = CanonicalCombo.CleanBlade(r.Blade, r.AssistBlade, vocab);
+        return new { Blade = blade, Assist = assist, r.Ratchet, r.Bit, r.Placement, r.PostedAt };
+    }).ToList();
+    var bladeMap = BladeCanonicalizer.BuildMap(prepared.Select(p => p.Blade));
+    var appearances = prepared.Select(p =>
+    {
+        var (blade, display) = CanonicalCombo.Resolve(p.Blade, p.Assist, p.Ratchet, p.Bit, bladeMap, vocab);
+        return new { Blade = blade, Display = display, p.Placement, Date = p.PostedAt?.ToString("yyyy-MM-dd") };
     });
     await File.WriteAllTextAsync(Path.Combine(outDir, "appearances.json"),
         JsonSerializer.Serialize(appearances, jsonOptions));

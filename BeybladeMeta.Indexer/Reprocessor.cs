@@ -53,13 +53,18 @@ public static class Reprocessor
             // else prose/noise — drop
         }
 
-        // Canonicalize bit, blade spelling and CX grouping — same path as the exporter.
+        // Split stuck assist codes off the blade, then canonicalize bit/blade/CX — same
+        // path as the exporter. Assist-splitting runs before the merge map.
         var vocab = PartsVocabulary.CreateDefault();
-        var bladeMap = BladeCanonicalizer.BuildMap(parsed.Select(p => p.Combo.Blade));
-        var appearances = parsed.Select(p =>
+        var prepared = parsed.Select(p =>
         {
-            var (blade, display) = CanonicalCombo.Resolve(
-                p.Combo.Blade, p.Combo.AssistBlade, p.Combo.Ratchet, p.Combo.Bit, bladeMap, vocab);
+            var (blade, assist) = CanonicalCombo.CleanBlade(p.Combo.Blade, p.Combo.AssistBlade, vocab);
+            return (Blade: blade, Assist: assist, p.Combo.Ratchet, p.Combo.Bit, p.Placement, p.Date);
+        }).ToList();
+        var bladeMap = BladeCanonicalizer.BuildMap(prepared.Select(p => p.Blade));
+        var appearances = prepared.Select(p =>
+        {
+            var (blade, display) = CanonicalCombo.Resolve(p.Blade, p.Assist, p.Ratchet, p.Bit, bladeMap, vocab);
             return new NewAppearance(blade, display, p.Placement, p.Date);
         }).ToList();
 

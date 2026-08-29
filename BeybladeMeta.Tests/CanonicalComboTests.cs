@@ -23,4 +23,17 @@ public class CanonicalComboTests
         Assert.Equal("Blast", blade);
         Assert.Equal("Wolf Blast Heavy 3-60Rush", display);
     }
+
+    [Fact]
+    public void Stuck_assist_code_is_split_off_so_cx_grouping_works()
+    {
+        // Old DB rows have the assist code stuck in the blade ("ValkyrieBlast J", no assist field).
+        var (blade, assist) = CanonicalCombo.CleanBlade("ValkyrieBlast J", null, Vocab);
+        Assert.Equal("ValkyrieBlast", blade);
+        Assert.Equal("Jaggy", assist);
+
+        var (group, display) = CanonicalCombo.Resolve(blade, assist, "3-60", "LR", Identity, Vocab);
+        Assert.Equal("Blast", group); // now groups under Blast instead of "ValkyrieBlast J"
+        Assert.Equal("Valkyrie Blast Jaggy 3-60LowRush", display);
+    }
 }

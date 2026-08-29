@@ -9,6 +9,13 @@ namespace BeybladeMeta.Core.Parsing;
 /// </summary>
 public static class CanonicalCombo
 {
+    /// <summary>Splits any assist part out of the raw blade+assist and canonicalizes it.</summary>
+    public static (string Blade, string? Assist) CleanBlade(string blade, string? assistBlade, PartsVocabulary vocabulary)
+    {
+        var combined = string.IsNullOrEmpty(assistBlade) ? blade : $"{blade} {assistBlade}";
+        return vocabulary.SplitAssist(combined);
+    }
+
     public static (string GroupBlade, string Display) Resolve(
         string blade, string? assistBlade, string? ratchet, string bit,
         IReadOnlyDictionary<string, string> bladeMap, PartsVocabulary vocabulary)

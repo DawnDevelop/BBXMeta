@@ -94,13 +94,7 @@ public sealed partial class PostParser(PartsVocabulary vocabulary)
         return new Combo(blade2, assist2, null, bit2);
     }
 
-    private (string Blade, string? Assist) SplitAssist(string bladePart)
-    {
-        var tokens = bladePart.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        if (tokens.Length >= 2 && vocabulary.IsAssist(tokens[^1]))
-            return (string.Join(' ', tokens[..^1]), tokens[^1]);
-        return (bladePart, null);
-    }
+    private (string Blade, string? Assist) SplitAssist(string bladePart) => vocabulary.SplitAssist(bladePart);
 
     // Strip trailing annotations like "- Finals", ", First & Final", stray brackets.
     private static string CleanBit(string bit)

@@ -7,15 +7,15 @@ namespace BeybladeMeta.Core.Parsing;
 /// </summary>
 public sealed class PartsVocabulary
 {
-    private readonly Dictionary<string, string> _bitCanonical; // normalized form -> canonical full name
-    private readonly HashSet<string> _assists;                 // normalized assist-blade names
+    private readonly Dictionary<string, string> _bitCanonical;    // normalized -> canonical bit
+    private readonly Dictionary<string, string> _assistCanonical; // normalized (incl. code) -> canonical assist
     private readonly int _maxBitWords;
 
     public PartsVocabulary(IEnumerable<string> bits, IEnumerable<string> assistBlades)
     {
         var bitList = bits.Distinct().ToList();
         _bitCanonical = BuildBitMap(bitList);
-        _assists = assistBlades.Select(Normalize).ToHashSet();
+        _assistCanonical = BuildAssistMap(assistBlades.Distinct().ToList());
         _maxBitWords = bitList.Count == 0 ? 1 : bitList.Select(b => b.Split(' ').Length).Max();
     }
 
@@ -56,7 +56,29 @@ public sealed class PartsVocabulary
         return _bitCanonical.TryGetValue(Normalize(trimmed), out var canonical) ? canonical : trimmed;
     }
 
-    public bool IsAssist(string token) => _assists.Contains(Normalize(token));
+    // Assists map their full name and single-letter code (Jaggy/J, Heavy/H) to the full name.
+    // Codes are unambiguous among assists; bit codes live in a separate map and a separate
+    // position (after the ratchet), so "H" as a blade-side assist never clashes with "H"=Hexa.
+    private static Dictionary<string, string> BuildAssistMap(List<string> assists)
+    {
+        var map = new Dictionary<string, string>();
+        foreach (var a in assists)
+            map[Normalize(a)] = a;
+        var byCode = assists.GroupBy(a => Normalize(a)[..1]);
+        foreach (var group in byCode)
+            if (group.Count() == 1 && !map.ContainsKey(group.Key))
+                map[group.Key] = group.Single();
+        return map;
+    }
+
+    /// <summary>Splits a trailing assist part (full name or code) off a blade string.</summary>
+    public (string Blade, string? Assist) SplitAssist(string bladePart)
+    {
+        var tokens = bladePart.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (tokens.Length >= 2 && _assistCanonical.TryGetValue(Normalize(tokens[^1]), out var assist))
+            return (string.Join(' ', tokens[..^1]), assist);
+        return (bladePart, null);
+    }
 
     /// <summary>
     /// If the trailing 1..N tokens form a known bit, returns (bladePart, canonicalBit);
