@@ -27,28 +27,31 @@ else if (_all.Count == 0)
 }
 else
 {
-    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-3" Spacing="3" Wrap="Wrap.Wrap">
+    <div style="max-width: 940px; margin-inline: auto;">
         <MudToggleGroup T="string" Value="_view" ValueChanged="OnViewChanged" Color="Color.Primary"
-                        Size="Size.Small" CheckMark="false" SelectionMode="SelectionMode.SingleSelection">
+                        Size="Size.Medium" CheckMark="false" SelectionMode="SelectionMode.SingleSelection" Class="mb-4">
             <MudToggleItem Value="@("blades")" Text="Blades" />
             <MudToggleItem Value="@("combos")" Text="Combos" />
             <MudToggleItem Value="@("ratchets")" Text="Ratchets" />
             <MudToggleItem Value="@("bits")" Text="Bits" />
         </MudToggleGroup>
-        <MudSelect T="string" Value="_selectedWindow" ValueChanged="OnWindowChanged" Label="Time range"
-                   Variant="Variant.Outlined" Dense="true" Style="max-width: 13rem;">
-            @foreach (var w in Windows)
-            {
-                <MudSelectItem T="string" Value="@w.Key">@w.Label</MudSelectItem>
-            }
-        </MudSelect>
-        <MudTextField @bind-Value="_search" Label="Search" Variant="Variant.Outlined" Dense="true"
-                      Clearable="true" Immediate="true" DebounceInterval="150"
-                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Style="max-width: 16rem;" />
-        <MudChip T="string" Color="Color.Primary" Variant="Variant.Outlined">@Rows.Count() @_view</MudChip>
-    </MudStack>
 
-    <MudTable Items="Rows" Hover="true" Dense="true" Elevation="2" T="RankRow" Style="max-width: 940px; margin-inline: auto;">
+        <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;" class="mb-3">
+            <MudSelect T="string" Value="_selectedWindow" ValueChanged="OnWindowChanged" Label="Time range"
+                       Variant="Variant.Outlined" Dense="true" Style="width: 12rem;">
+                @foreach (var w in Windows)
+                {
+                    <MudSelectItem T="string" Value="@w.Key">@w.Label</MudSelectItem>
+                }
+            </MudSelect>
+            <MudTextField @bind-Value="_search" Label="Search" Variant="Variant.Outlined" Dense="true"
+                          Clearable="true" Immediate="true" DebounceInterval="150"
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Style="width: 15rem;" />
+            <MudSpacer />
+            <MudText Typo="Typo.body2" Class="mud-text-secondary">@Rows.Count() @_view</MudText>
+        </div>
+
+        <MudTable Items="Rows" Hover="true" Dense="true" Elevation="2" T="RankRow">
         <HeaderContent>
             @if (HasDrilldown)
             {
@@ -114,7 +117,8 @@ else
         <PagerContent>
             <MudTablePager PageSizeOptions="new[] { 25, 50, 100 }" />
         </PagerContent>
-    </MudTable>
+        </MudTable>
+    </div>
 }
 
 @code {
