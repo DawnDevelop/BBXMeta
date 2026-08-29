@@ -3,10 +3,10 @@
 
 <PageTitle>Beyblade X Meta Leaderboard</PageTitle>
 
-<MudText Typo="Typo.h4" GutterBottom="true">Beyblade Meta Leaderboard</MudText>
+<MudText Typo="Typo.h4" GutterBottom="true">Beyblade X Meta Leaderboard</MudText>
 <MudText Typo="Typo.body2" Class="mud-text-secondary mb-4">
-    Ranked by blade. Score = 3 × #1 + 2 × #2 + 1 × #3 placements. Click a blade to see the
-    exact combos run on it and which performed best.
+    Score = 3 × #1 + 2 × #2 + 1 × #3 placements. The ▲▼ column shows movement versus the
+    previous period of the same length.
 </MudText>
 
 @if (_error is not null)
@@ -23,82 +23,82 @@ else if (_all.Count == 0)
 }
 else
 {
-    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-3" Spacing="3">
-        <MudAutocomplete T="string" Value="_search" ValueChanged="OnSearchChanged" Label="Search blade"
-                         SearchFunc="SearchBlades" Clearable="true" ResetValueOnEmptyText="true"
-                         CoerceValue="true" DebounceInterval="200" MaxItems="20" Variant="Variant.Outlined"
-                         Dense="true" AdornmentIcon="@Icons.Material.Filled.Search" Style="max-width: 18rem;" />
+    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-3" Spacing="3" Wrap="Wrap.Wrap">
+        <MudToggleGroup T="string" Value="_view" ValueChanged="OnViewChanged" Color="Color.Primary"
+                        Size="Size.Small" CheckMark="false" SelectionMode="SelectionMode.SingleSelection">
+            <MudToggleItem Value="@("blades")" Text="Blades" />
+            <MudToggleItem Value="@("combos")" Text="Combos" />
+            <MudToggleItem Value="@("ratchets")" Text="Ratchets" />
+            <MudToggleItem Value="@("bits")" Text="Bits" />
+        </MudToggleGroup>
         <MudSelect T="string" Value="_selectedWindow" ValueChanged="OnWindowChanged" Label="Time range"
-                   Variant="Variant.Outlined" Dense="true" Style="max-width: 14rem;">
+                   Variant="Variant.Outlined" Dense="true" Style="max-width: 13rem;">
             @foreach (var w in Windows)
             {
                 <MudSelectItem T="string" Value="@w.Key">@w.Label</MudSelectItem>
             }
         </MudSelect>
-        <MudChip T="string" Color="Color.Primary" Variant="Variant.Outlined">
-            @Blades.Count() blades · @FilteredCount appearances
-        </MudChip>
-        @if (_undatedCount > 0 && _selectedWindow != "all")
-        {
-            <MudChip T="string" Color="Color.Warning" Variant="Variant.Text" Size="Size.Small">
-                @_undatedCount undated appearances excluded
-            </MudChip>
-        }
+        <MudTextField @bind-Value="_search" Label="Search" Variant="Variant.Outlined" Dense="true"
+                      Clearable="true" Immediate="true" DebounceInterval="150"
+                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Style="max-width: 16rem;" />
+        <MudChip T="string" Color="Color.Primary" Variant="Variant.Outlined">@Rows.Count() @_view</MudChip>
     </MudStack>
 
-    <MudTable Items="Blades" Hover="true" Dense="true" Elevation="2" AllowUnsorted="false"
-              T="BladeRow" @bind-SelectedItem="_selected">
+    <MudTable Items="Rows" Hover="true" Dense="true" Elevation="2" T="RankRow">
         <HeaderContent>
-            <MudTh />
+            @if (_view == "blades")
+            {
+                <MudTh />
+            }
             <MudTh Style="width: 3rem;">#</MudTh>
-            <MudTh><MudTableSortLabel SortBy="@((BladeRow b) => b.Blade)" T="BladeRow">Blade</MudTableSortLabel></MudTh>
-            <MudTh><MudTableSortLabel SortBy="@((BladeRow b) => b.ComboCount)" T="BladeRow">Combos</MudTableSortLabel></MudTh>
-            <MudTh><MudTableSortLabel SortBy="@((BladeRow b) => b.First)" T="BladeRow">#1</MudTableSortLabel></MudTh>
-            <MudTh><MudTableSortLabel SortBy="@((BladeRow b) => b.Second)" T="BladeRow">#2</MudTableSortLabel></MudTh>
-            <MudTh><MudTableSortLabel SortBy="@((BladeRow b) => b.Third)" T="BladeRow">#3</MudTableSortLabel></MudTh>
-            <MudTh><MudTableSortLabel SortBy="@((BladeRow b) => b.Score)" T="BladeRow" InitialDirection="SortDirection.Descending">Score</MudTableSortLabel></MudTh>
+            <MudTh Style="width: 4rem;">+/−</MudTh>
+            <MudTh>@ColumnName</MudTh>
+            <MudTh>#1</MudTh>
+            <MudTh>#2</MudTh>
+            <MudTh>#3</MudTh>
+            <MudTh>Total</MudTh>
+            <MudTh>Score</MudTh>
         </HeaderContent>
         <RowTemplate>
-            <MudTd>
-                <MudIconButton Size="Size.Small" OnClick="@(() => Toggle(context.Blade))"
-                               Icon="@(IsExpanded(context.Blade) ? Icons.Material.Filled.KeyboardArrowUp : Icons.Material.Filled.KeyboardArrowDown)" />
-            </MudTd>
+            @if (_view == "blades")
+            {
+                <MudTd>
+                    <MudIconButton Size="Size.Small" OnClick="@(() => Toggle(context.Name))"
+                                   Icon="@(IsExpanded(context.Name) ? Icons.Material.Filled.KeyboardArrowUp : Icons.Material.Filled.KeyboardArrowDown)" />
+                </MudTd>
+            }
             <MudTd DataLabel="#" Class="mud-text-secondary">@context.Rank</MudTd>
-            <MudTd DataLabel="Blade"><strong>@context.Blade</strong></MudTd>
-            <MudTd DataLabel="Combos">@context.ComboCount</MudTd>
+            <MudTd DataLabel="+/−">@Movement(context)</MudTd>
+            <MudTd DataLabel="@ColumnName"><strong>@context.Name</strong></MudTd>
             <MudTd DataLabel="#1">@context.First</MudTd>
             <MudTd DataLabel="#2">@context.Second</MudTd>
             <MudTd DataLabel="#3">@context.Third</MudTd>
+            <MudTd DataLabel="Total">@context.Total</MudTd>
             <MudTd DataLabel="Score"><strong>@context.Score</strong></MudTd>
         </RowTemplate>
         <ChildRowContent>
-            @if (IsExpanded(context.Blade))
+            @if (_view == "blades" && IsExpanded(context.Name))
             {
                 <MudTr>
-                    <td colspan="8" class="pa-4" style="background: var(--mud-palette-background-grey);">
-                        <MudText Typo="Typo.subtitle2" Class="mb-2">Combos run on @context.Blade — best first</MudText>
+                    <td colspan="9" class="pa-4" style="background: var(--mud-palette-background-grey);">
+                        <MudText Typo="Typo.subtitle2" Class="mb-2">Combos run on @context.Name — best first</MudText>
                         <MudSimpleTable Dense="true" Style="background: transparent;">
                             <thead>
-                                <tr>
-                                    <th>Combo</th><th>#1</th><th>#2</th><th>#3</th><th>Times run</th><th>Score</th>
-                                </tr>
+                                <tr><th>Combo</th><th>#1</th><th>#2</th><th>#3</th><th>Times run</th><th>Score</th></tr>
                             </thead>
                             <tbody>
-                                @foreach (var (combo, i) in CombosFor(context.Blade).Select((c, i) => (c, i)))
+                                @foreach (var (combo, i) in CombosFor(context.Name).Select((c, i) => (c, i)))
                                 {
                                     <tr>
                                         <td>
-                                            <code>@combo.Display</code>
+                                            <code>@combo.Name</code>
                                             @if (i == 0 && combo.Score > 0)
                                             {
                                                 <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Text" Class="ml-2">best</MudChip>
                                             }
                                         </td>
-                                        <td>@combo.First</td>
-                                        <td>@combo.Second</td>
-                                        <td>@combo.Third</td>
-                                        <td>@combo.Total</td>
-                                        <td><strong>@combo.Score</strong></td>
+                                        <td>@combo.First</td><td>@combo.Second</td><td>@combo.Third</td>
+                                        <td>@combo.Total</td><td><strong>@combo.Score</strong></td>
                                     </tr>
                                 }
                             </tbody>
@@ -114,24 +114,20 @@ else
 }
 
 @code {
-    public sealed record Appearance(string Blade, string Display, int Placement, string? Date)
+    public sealed record Appearance(string Blade, string Display, string? Ratchet, string Bit, int Placement, string? Date)
     {
         public DateOnly? On => DateOnly.TryParse(Date, out var d) ? d : null;
     }
 
-    public sealed record ComboRow(string Display, int First, int Second, int Third)
+    public sealed record RankRow(string Name, int First, int Second, int Third)
     {
         public int Total => First + Second + Third;
         public int Score => 3 * First + 2 * Second + Third;
-    }
-
-    public sealed record BladeRow(string Blade, int ComboCount, int First, int Second, int Third)
-    {
-        public int Score => 3 * First + 2 * Second + Third;
         public int Rank { get; init; }
+        public int? Delta { get; init; } // prior rank − current rank; null = no prior data
+        public bool IsNew { get; init; }
     }
 
-    // Relative time windows measured back from today; null cutoff = all time.
     private sealed record Window(string Key, string Label, Func<DateOnly, DateOnly?> Cutoff);
 
     private static readonly Window[] Windows =
@@ -145,81 +141,99 @@ else
     ];
 
     private List<Appearance>? _all;
-    private int _undatedCount;
+    private string _view = "blades";
     private string _selectedWindow = "4w";
     private string? _search;
-    private BladeRow? _selected;
     private readonly HashSet<string> _expanded = [];
 
-    // Per-window results, recomputed only when the time range changes (not per keystroke).
-    private List<Appearance> _windowAppearances = [];
-    private List<BladeRow> _windowBlades = [];
-    private List<string> _bladeNames = [];
+    private List<Appearance> _current = [];
+    private List<Appearance>? _prior;
+
+    private string ColumnName => _view switch { "combos" => "Combo", "ratchets" => "Ratchet", "bits" => "Bit", _ => "Blade" };
+
+    private Func<Appearance, string?> KeySelector => _view switch
+    {
+        "combos" => a => a.Display,
+        "ratchets" => a => a.Ratchet,
+        "bits" => a => a.Bit,
+        _ => a => a.Blade,
+    };
 
     private void RecomputeWindow()
     {
-        var window = Windows.First(w => w.Key == _selectedWindow);
-        var cutoff = window.Cutoff(DateOnly.FromDateTime(DateTime.Today));
-        _windowAppearances = (cutoff is null ? _all! : _all!.Where(a => a.On is { } d && d >= cutoff)).ToList();
-
-        _windowBlades = _windowAppearances
-            .GroupBy(a => a.Blade)
-            .Select(g => new BladeRow(
-                g.Key,
-                g.Select(a => a.Display).Distinct().Count(),
-                g.Count(a => a.Placement == 1),
-                g.Count(a => a.Placement == 2),
-                g.Count(a => a.Placement == 3)))
-            .OrderByDescending(b => b.Score)
-            .Select((b, i) => b with { Rank = i + 1 })
-            .ToList();
-        _bladeNames = _windowBlades.Select(b => b.Blade).ToList();
-    }
-
-    private int FilteredCount => _windowAppearances.Count;
-
-    // Cheap: filters the cached ~hundreds of ranked rows, keeping each blade's true rank.
-    private IEnumerable<BladeRow> Blades => string.IsNullOrWhiteSpace(_search)
-        ? _windowBlades
-        : _windowBlades.Where(b => b.Blade.Contains(_search, StringComparison.OrdinalIgnoreCase));
-
-    private Task<IEnumerable<string>> SearchBlades(string? value, CancellationToken ct)
-    {
-        IEnumerable<string> names = _bladeNames;
-        if (!string.IsNullOrWhiteSpace(value))
-            names = names.Where(n => n.Contains(value, StringComparison.OrdinalIgnoreCase));
-        return Task.FromResult(names.Take(20));
-    }
-
-    private void OnSearchChanged(string? value)
-    {
-        _search = value;
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        var cutoff = Windows.First(w => w.Key == _selectedWindow).Cutoff(today);
+        if (cutoff is null)
+        {
+            _current = _all!;
+            _prior = null;
+        }
+        else
+        {
+            var length = today.DayNumber - cutoff.Value.DayNumber;
+            var priorStart = cutoff.Value.AddDays(-length);
+            _current = _all!.Where(a => a.On is { } d && d >= cutoff).ToList();
+            _prior = _all!.Where(a => a.On is { } d && d >= priorStart && d < cutoff).ToList();
+        }
         _expanded.Clear();
     }
 
-    private IEnumerable<ComboRow> CombosFor(string blade) => _windowAppearances
-        .Where(a => a.Blade == blade)
-        .GroupBy(a => a.Display)
-        .Select(g => new ComboRow(
-            g.Key,
-            g.Count(a => a.Placement == 1),
-            g.Count(a => a.Placement == 2),
-            g.Count(a => a.Placement == 3)))
-        .OrderByDescending(c => c.Score).ThenByDescending(c => c.Total);
-
-    private bool IsExpanded(string blade) => _expanded.Contains(blade);
-    private void Toggle(string blade)
+    private IEnumerable<RankRow> Rows
     {
-        if (!_expanded.Remove(blade)) _expanded.Add(blade);
+        get
+        {
+            var rows = Rank(_current, _prior, KeySelector);
+            return string.IsNullOrWhiteSpace(_search)
+                ? rows
+                : rows.Where(r => r.Name.Contains(_search, StringComparison.OrdinalIgnoreCase));
+        }
     }
+
+    private static List<RankRow> Rank(List<Appearance> current, List<Appearance>? prior, Func<Appearance, string?> key)
+    {
+        var priorRanks = prior is null ? null : RankIndex(prior, key);
+        return Group(current, key)
+            .OrderByDescending(r => r.Score)
+            .Select((r, i) =>
+            {
+                var rank = i + 1;
+                int? delta = priorRanks is not null && priorRanks.TryGetValue(r.Name, out var pr) ? pr - rank : null;
+                var isNew = priorRanks is not null && !priorRanks.ContainsKey(r.Name);
+                return r with { Rank = rank, Delta = delta, IsNew = isNew };
+            })
+            .ToList();
+    }
+
+    private static Dictionary<string, int> RankIndex(List<Appearance> data, Func<Appearance, string?> key) =>
+        Group(data, key)
+            .OrderByDescending(r => r.Score)
+            .Select((r, i) => (r.Name, Rank: i + 1))
+            .ToDictionary(x => x.Name, x => x.Rank);
+
+    private static IEnumerable<RankRow> Group(IEnumerable<Appearance> data, Func<Appearance, string?> key) =>
+        data.Where(a => !string.IsNullOrEmpty(key(a)))
+            .GroupBy(key)
+            .Select(g => new RankRow(
+                g.Key!,
+                g.Count(a => a.Placement == 1),
+                g.Count(a => a.Placement == 2),
+                g.Count(a => a.Placement == 3)));
+
+    private IEnumerable<RankRow> CombosFor(string blade) =>
+        Rank(_current.Where(a => a.Blade == blade).ToList(), null, a => a.Display)
+            .OrderByDescending(c => c.Score).ThenByDescending(c => c.Total);
+
+    private bool IsExpanded(string name) => _expanded.Contains(name);
+    private void Toggle(string name) { if (!_expanded.Remove(name)) _expanded.Add(name); }
+
+    private void OnViewChanged(string view) { _view = view; _expanded.Clear(); }
+    private void OnWindowChanged(string window) { _selectedWindow = window; RecomputeWindow(); }
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
             _all = await Http.GetFromJsonAsync<List<Appearance>>("data/appearances.json") ?? [];
-            _undatedCount = _all.Count(a => a.On is null);
-            // Until a re-index populates dates, the 4-week default would be empty — show all instead.
             if (!_all.Any(a => a.On is not null))
                 _selectedWindow = "all";
             RecomputeWindow();
@@ -232,11 +246,20 @@ else
 
     private string? _error;
 
-    private void OnWindowChanged(string window)
-    {
-        _selectedWindow = window;
-        _search = null;
-        _expanded.Clear();
-        RecomputeWindow();
-    }
+    private RenderFragment Movement(RankRow r) =>@<span>
+        @if (r.IsNew)
+        {
+            <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Text">new</MudChip>
+        }
+        else if (r.Delta is { } d && d != 0)
+        {
+            <MudIcon Size="Size.Small" Color="@(d > 0 ? Color.Success : Color.Error)"
+                     Icon="@(d > 0 ? Icons.Material.Filled.ArrowUpward : Icons.Material.Filled.ArrowDownward)" />
+            <span>@Math.Abs(d)</span>
+        }
+        else
+        {
+            <span class="mud-text-secondary">—</span>
+        }
+    </span>;
 }

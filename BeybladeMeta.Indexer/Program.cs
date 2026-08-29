@@ -74,7 +74,15 @@ static async Task ExportAsync(MetaDbContext db, string outDir)
     var appearances = prepared.Select(p =>
     {
         var (blade, display) = CanonicalCombo.Resolve(p.Blade, p.Assist, p.Ratchet, p.Bit, bladeMap, vocab);
-        return new { Blade = blade, Display = display, p.Placement, Date = p.PostedAt?.ToString("yyyy-MM-dd") };
+        return new
+        {
+            Blade = blade,
+            Display = display,
+            Ratchet = p.Ratchet,
+            Bit = vocab.CanonicalBit(p.Bit),
+            p.Placement,
+            Date = p.PostedAt?.ToString("yyyy-MM-dd"),
+        };
     });
     await File.WriteAllTextAsync(Path.Combine(outDir, "appearances.json"),
         JsonSerializer.Serialize(appearances, jsonOptions));

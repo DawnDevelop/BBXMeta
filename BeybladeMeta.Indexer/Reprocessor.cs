@@ -12,7 +12,7 @@ public static class Reprocessor
 {
     private sealed record OldAppearance(string? Blade, string Display, int Placement, string? Date);
     private sealed record OldUnmatched(int Page, int Placement, string Line);
-    private sealed record NewAppearance(string Blade, string Display, int Placement, string? Date);
+    private sealed record NewAppearance(string Blade, string Display, string? Ratchet, string Bit, int Placement, string? Date);
 
     public static void Run(string dir)
     {
@@ -65,7 +65,7 @@ public static class Reprocessor
         var appearances = prepared.Select(p =>
         {
             var (blade, display) = CanonicalCombo.Resolve(p.Blade, p.Assist, p.Ratchet, p.Bit, bladeMap, vocab);
-            return new NewAppearance(blade, display, p.Placement, p.Date);
+            return new NewAppearance(blade, display, p.Ratchet, vocab.CanonicalBit(p.Bit), p.Placement, p.Date);
         }).ToList();
 
         File.WriteAllText(appPath, JsonSerializer.Serialize(appearances, outOpts));
