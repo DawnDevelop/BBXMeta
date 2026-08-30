@@ -34,6 +34,7 @@ else
             <MudToggleItem Value="@("combos")" Text="Combos" />
             <MudToggleItem Value="@("ratchets")" Text="Ratchets" />
             <MudToggleItem Value="@("bits")" Text="Bits" />
+            <MudToggleItem Value="@("decks")" Text="Decks" />
         </MudToggleGroup>
 
         <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;" class="mb-3">
@@ -88,7 +89,7 @@ else
             {
                 <MudTr>
                     <td colspan="9" class="pa-4" style="background: var(--mud-palette-background-grey);">
-                        <MudText Typo="Typo.subtitle2" Class="mb-2">Top combos using @context.Name</MudText>
+                        <MudText Typo="Typo.subtitle2" Class="mb-2">@DrilldownTitle</MudText>
                         <MudSimpleTable Dense="true" Style="background: transparent;">
                             <thead>
                                 <tr><th>Combo</th><th>#1</th><th>#2</th><th>#3</th><th>Times run</th><th>Score</th></tr>
@@ -122,10 +123,13 @@ else
 }
 
 @code {
-    public sealed record Appearance(string Blade, string Display, string? Ratchet, string Bit, int Placement, string? Date)
+    public sealed record Appearance(string Blade, string Display, string? Ratchet, string Bit, int Placement, string? Date, int? Deck)
     {
         public DateOnly? On => DateOnly.TryParse(Date, out var d) ? d : null;
     }
+
+    // A player's 3-bey deck at one event.
+    private sealed record DeckInstance(int Placement, DateOnly? On, string Blades, string Combos);
 
     public sealed record RankRow(string Name, int First, int Second, int Third)
     {
@@ -156,9 +160,15 @@ else
 
     private List<Appearance> _current = [];
     private List<Appearance>? _prior;
+    private List<DeckInstance> _allDecks = [];
+    private List<DeckInstance> _currentDecks = [];
+    private List<DeckInstance>? _priorDecks;
     private DateOnly? _anchor; // latest event date in the data — the reference for all windows
 
-    private string ColumnName => _view switch { "combos" => "Combo", "ratchets" => "Ratchet", "bits" => "Bit", _ => "Blade" };
+    private string ColumnName => _view switch
+    {
+        "combos" => "Combo", "ratchets" => "Ratchet", "bits" => "Bit", "decks" => "Deck (3 blades)", _ => "Blade"
+    };
 
     private Func<Appearance, string?> KeySelector => _view switch
     {
@@ -167,6 +177,24 @@ else
         "bits" => a => a.Bit,
         _ => a => a.Blade,
     };
+
+    private void BuildDecks()
+    {
+        _allDecks = _all!
+            .Where(a => a.Deck is not null)
+            .GroupBy(a => a.Deck!.Value)
+            .Where(g => g.Count() == 3) // standard 3-on-3 decks
+            .Select(g =>
+            {
+                var beys = g.ToList();
+                return new DeckInstance(
+                    beys[0].Placement,
+                    beys[0].On,
+                    string.Join(" + ", beys.Select(b => b.Blade).OrderBy(x => x, StringComparer.Ordinal)),
+                    string.Join(" + ", beys.Select(b => b.Display).OrderBy(x => x, StringComparer.Ordinal)));
+            })
+            .ToList();
+    }
 
     private void RecomputeWindow()
     {
@@ -178,6 +206,8 @@ else
         {
             _current = _all!;
             _prior = null;
+            _currentDecks = _allDecks;
+            _priorDecks = null;
         }
         else
         {
@@ -185,6 +215,8 @@ else
             var priorStart = cutoff.Value.AddDays(-length);
             _current = _all!.Where(a => a.On is { } d && d >= cutoff).ToList();
             _prior = _all!.Where(a => a.On is { } d && d >= priorStart && d < cutoff).ToList();
+            _currentDecks = _allDecks.Where(x => x.On is { } d && d >= cutoff).ToList();
+            _priorDecks = _allDecks.Where(x => x.On is { } d && d >= priorStart && d < cutoff).ToList();
         }
         _expanded.Clear();
     }
@@ -193,7 +225,10 @@ else
     {
         get
         {
-            var rows = Rank(_current, _prior, KeySelector);
+            var rows = _view == "decks"
+                ? RankPairs(_currentDecks.Select(x => (x.Blades, x.Placement)),
+                            _priorDecks?.Select(x => (x.Blades, x.Placement)))
+                : Rank(_current, _prior, KeySelector);
             return string.IsNullOrWhiteSpace(_search)
                 ? rows
                 : rows.Where(r => r.Name.Contains(_search, StringComparison.OrdinalIgnoreCase));
@@ -205,10 +240,17 @@ else
     private static IOrderedEnumerable<RankRow> Ordered(IEnumerable<RankRow> rows) =>
         rows.OrderByDescending(r => r.Score).ThenByDescending(r => r.Total).ThenBy(r => r.Name, StringComparer.Ordinal);
 
-    private static List<RankRow> Rank(List<Appearance> current, List<Appearance>? prior, Func<Appearance, string?> key)
+    private static List<RankRow> Rank(List<Appearance> current, List<Appearance>? prior, Func<Appearance, string?> key) =>
+        RankPairs(Pairs(current, key), prior is null ? null : Pairs(prior, key));
+
+    private static IEnumerable<(string, int)> Pairs(IEnumerable<Appearance> data, Func<Appearance, string?> key) =>
+        data.Where(a => !string.IsNullOrEmpty(key(a))).Select(a => (key(a)!, a.Placement));
+
+    // Rank (name, placement) pairs by score with deterministic ties and prior-period movement.
+    private static List<RankRow> RankPairs(IEnumerable<(string Key, int Placement)> current, IEnumerable<(string Key, int Placement)>? prior)
     {
-        var priorRanks = prior is null ? null : RankIndex(prior, key);
-        return Ordered(Group(current, key))
+        var priorRanks = prior is null ? null : RankIndexPairs(prior);
+        return Ordered(GroupPairs(current))
             .Select((r, i) =>
             {
                 var rank = i + 1;
@@ -219,28 +261,31 @@ else
             .ToList();
     }
 
-    private static Dictionary<string, int> RankIndex(List<Appearance> data, Func<Appearance, string?> key) =>
-        Ordered(Group(data, key))
+    private static Dictionary<string, int> RankIndexPairs(IEnumerable<(string Key, int Placement)> data) =>
+        Ordered(GroupPairs(data))
             .Select((r, i) => (r.Name, Rank: i + 1))
             .ToDictionary(x => x.Name, x => x.Rank);
 
-    private static IEnumerable<RankRow> Group(IEnumerable<Appearance> data, Func<Appearance, string?> key) =>
-        data.Where(a => !string.IsNullOrEmpty(key(a)))
-            .GroupBy(key)
+    private static IEnumerable<RankRow> GroupPairs(IEnumerable<(string Key, int Placement)> data) =>
+        data.GroupBy(p => p.Key)
             .Select(g => new RankRow(
-                g.Key!,
-                g.Count(a => a.Placement == 1),
-                g.Count(a => a.Placement == 2),
-                g.Count(a => a.Placement == 3)));
+                g.Key,
+                g.Count(p => p.Placement == 1),
+                g.Count(p => p.Placement == 2),
+                g.Count(p => p.Placement == 3)));
 
-    // Blades, ratchets and bits drill down into their combos; combos are already the leaf.
+    // Blades, ratchets, bits and decks drill down into their combos; combos are the leaf.
     private bool HasDrilldown => _view != "combos";
+
+    private string DrilldownTitle => _view == "decks" ? "Exact combos run in this deck" : $"Top combos using this {_view.TrimEnd('s')}";
 
     private IEnumerable<RankRow> CombosForKey(string name)
     {
-        var key = KeySelector;
-        return Rank(_current.Where(a => key(a) == name).ToList(), null, a => a.Display)
-            .OrderByDescending(c => c.Score).ThenByDescending(c => c.Total);
+        // For decks the leaf is the exact 3-combo line-up; for the rest it's the single combo.
+        var pairs = _view == "decks"
+            ? _currentDecks.Where(x => x.Blades == name).Select(x => (x.Combos, x.Placement))
+            : Pairs(_current.Where(a => KeySelector(a) == name), a => a.Display);
+        return RankPairs(pairs, null).OrderByDescending(c => c.Score).ThenByDescending(c => c.Total);
     }
 
     private bool IsExpanded(string name) => _expanded.Contains(name);
@@ -260,6 +305,7 @@ else
                 _anchor = null;
                 _selectedWindow = "all";
             }
+            BuildDecks();
             RecomputeWindow();
         }
         catch (HttpRequestException)

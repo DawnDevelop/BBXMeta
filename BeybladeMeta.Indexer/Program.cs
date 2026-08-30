@@ -28,6 +28,13 @@ db.Database.EnsureCreated();
 
 var ingestion = new IngestionService(db, new PostParser(PartsVocabulary.CreateDefault()));
 
+// Re-export from the existing database without fetching (regenerates JSON incl. deck ids).
+if (Environment.GetEnvironmentVariable("EXPORT_ONLY") == "1")
+{
+    await ExportAsync(db, outDir);
+    return 0;
+}
+
 try
 {
     using var http = new HttpClient();
@@ -59,8 +66,18 @@ static async Task ExportAsync(MetaDbContext db, string outDir)
     var jsonOptions = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
     var rows = await db.Appearances
-        .Select(a => new { a.Blade, a.AssistBlade, a.Ratchet, a.Bit, a.Placement, a.Post!.PostedAt })
+        .Select(a => new { a.Blade, a.AssistBlade, a.Ratchet, a.Bit, a.Placement, a.IngestedPostId, a.Post!.PostedAt })
         .ToListAsync();
+
+    // A deck is the set of combos one player ran at one event = one post + placement.
+    var deckIds = new Dictionary<(int Post, int Placement), int>();
+    int DeckId(int post, int placement)
+    {
+        var key = (post, placement);
+        if (!deckIds.TryGetValue(key, out var id))
+            deckIds[key] = id = deckIds.Count;
+        return id;
+    }
 
     // Split stuck assist codes off the blade, then canonicalize bit/blade/CX — same path
     // as the reprocessor. Assist-splitting runs before the merge map so blades are clean.
@@ -68,7 +85,7 @@ static async Task ExportAsync(MetaDbContext db, string outDir)
     var prepared = rows.Select(r =>
     {
         var (blade, assist) = CanonicalCombo.CleanBlade(r.Blade, r.AssistBlade, vocab);
-        return new { Blade = blade, Assist = assist, r.Ratchet, r.Bit, r.Placement, r.PostedAt };
+        return new { Blade = blade, Assist = assist, r.Ratchet, r.Bit, r.Placement, r.PostedAt, Deck = DeckId(r.IngestedPostId, r.Placement) };
     }).ToList();
     var bladeMap = BladeCanonicalizer.BuildMap(prepared.Select(p => p.Blade));
     var appearances = prepared.Select(p =>
@@ -82,6 +99,7 @@ static async Task ExportAsync(MetaDbContext db, string outDir)
             Bit = vocab.CanonicalBit(p.Bit),
             p.Placement,
             Date = p.PostedAt?.ToString("yyyy-MM-dd"),
+            p.Deck,
         };
     });
     await File.WriteAllTextAsync(Path.Combine(outDir, "appearances.json"),

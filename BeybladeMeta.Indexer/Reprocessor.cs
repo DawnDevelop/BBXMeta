@@ -10,9 +10,9 @@ namespace BeybladeMeta.Indexer;
 /// </summary>
 public static class Reprocessor
 {
-    private sealed record OldAppearance(string? Blade, string Display, int Placement, string? Date);
+    private sealed record OldAppearance(string? Blade, string Display, int Placement, string? Date, int? Deck);
     private sealed record OldUnmatched(int Page, int Placement, string Line);
-    private sealed record NewAppearance(string Blade, string Display, string? Ratchet, string Bit, int Placement, string? Date);
+    private sealed record NewAppearance(string Blade, string Display, string? Ratchet, string Bit, int Placement, string? Date, int? Deck);
 
     public static void Run(string dir)
     {
@@ -25,7 +25,7 @@ public static class Reprocessor
         var oldApp = JsonSerializer.Deserialize<List<OldAppearance>>(File.ReadAllText(appPath), opts) ?? [];
         var oldUnm = JsonSerializer.Deserialize<List<OldUnmatched>>(File.ReadAllText(unmPath), opts) ?? [];
 
-        var parsed = new List<(Combo Combo, int Placement, string? Date)>();
+        var parsed = new List<(Combo Combo, int Placement, string? Date, int? Deck)>();
         var stillUnmatched = new List<OldUnmatched>();
 
         // Previously-matched combos: re-parse their display so parts are re-derived consistently.
@@ -33,7 +33,7 @@ public static class Reprocessor
         {
             var combo = parser.TryParseCombo(a.Display);
             if (combo is not null)
-                parsed.Add((combo, a.Placement, a.Date));
+                parsed.Add((combo, a.Placement, a.Date, a.Deck));
         }
 
         // Previously-unmatched raw lines: recover the ones the new parser now understands.
@@ -43,7 +43,7 @@ public static class Reprocessor
             var combo = parser.TryParseCombo(u.Line);
             if (combo is not null)
             {
-                parsed.Add((combo, u.Placement, null));
+                parsed.Add((combo, u.Placement, null, null));
                 recovered++;
             }
             else if (LooksLikeCombo(parser, u.Line))
@@ -59,13 +59,13 @@ public static class Reprocessor
         var prepared = parsed.Select(p =>
         {
             var (blade, assist) = CanonicalCombo.CleanBlade(p.Combo.Blade, p.Combo.AssistBlade, vocab);
-            return (Blade: blade, Assist: assist, p.Combo.Ratchet, p.Combo.Bit, p.Placement, p.Date);
+            return (Blade: blade, Assist: assist, p.Combo.Ratchet, p.Combo.Bit, p.Placement, p.Date, p.Deck);
         }).ToList();
         var bladeMap = BladeCanonicalizer.BuildMap(prepared.Select(p => p.Blade));
         var appearances = prepared.Select(p =>
         {
             var (blade, display) = CanonicalCombo.Resolve(p.Blade, p.Assist, p.Ratchet, p.Bit, bladeMap, vocab);
-            return new NewAppearance(blade, display, p.Ratchet, vocab.CanonicalBit(p.Bit), p.Placement, p.Date);
+            return new NewAppearance(blade, display, p.Ratchet, vocab.CanonicalBit(p.Bit), p.Placement, p.Date, p.Deck);
         }).ToList();
 
         File.WriteAllText(appPath, JsonSerializer.Serialize(appearances, outOpts));
