@@ -1,0 +1,34 @@
+name: Deploy redirect
+
+# The leaderboard moved to https://beydle.com/meta (the DawnDevelop/Beydle repo now runs the indexer). This site only
+# forwards visitors there: every path, deep links included, serves the redirect page.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare Pages payload
+        run: |
+          cp redirect/index.html redirect/404.html
+          touch redirect/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: redirect
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
